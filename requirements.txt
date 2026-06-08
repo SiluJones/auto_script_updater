@@ -1,0 +1,7 @@
+# Núcleo da ferramenta (sem GUI) — suficiente para o CLI e os testes da F1.
+# Mantido leve de propósito: o core deve poder virar biblioteca pura (F4).
+PyYAML>=6.0
+jsonschema>=4.21
+libcst>=1.8
+jmespath>=1.0
+colorama>=0.4.6

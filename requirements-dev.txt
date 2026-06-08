@@ -1,0 +1,6 @@
+# Desenvolvimento: inclui GUI + ferramentas de teste e qualidade.
+-r requirements-gui.txt
+pytest>=8.0
+pytest-qt>=4.4
+ruff>=0.4
+black>=24.0

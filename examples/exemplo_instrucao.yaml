@@ -1,0 +1,131 @@
+# Exemplo de instrução v1.0 — válido contra src/schemas/instruction_v1.schema.json
+# Demonstra as estratégias para cada tipo de arquivo, o mecanismo UNIVERSAL
+# (janela de contexto, que funciona em qualquer linguagem) e a criação de arquivo.
+
+format_version: "1.0"
+generated_by: "claude"
+generated_at: "2026-06-07T10:00:00"
+description: "Adiciona logging à autenticação, atualiza docs e config, ajusta um arquivo JS e cria um módulo novo."
+
+settings:
+  backup: true
+  dry_run: false
+  stop_on_error: true
+  encoding: "utf-8"
+
+files:
+  # ── Python: inserção por padrão + substituição de função (libcst) ──────────
+  - id: "f1"
+    path_mode: "relative"
+    relative_path: "src/auth/login.py"
+    type: "python"
+    modifications:
+      - id: "m1"
+        description: "Adiciona import de logging logo após 'import os'"
+        strategy: "insert_after_pattern"
+        location:
+          pattern: "^import os$"
+          occurrence: 1
+        content: |
+          import logging
+
+          logger = logging.getLogger(__name__)
+
+      - id: "m2"
+        description: "Substitui a função validate_token por versão que registra tentativas"
+        strategy: "replace_function"
+        location:
+          name: "validate_token"
+        new_content: |
+          def validate_token(token: str) -> bool:
+              """Valida o token JWT e registra tentativas."""
+              if not token:
+                  logger.warning("Token vazio recebido na validação")
+                  return False
+              logger.debug("Validando token: %s...", token[:8])
+              return True
+
+  # ── Markdown: substituição de seção por heading ───────────────────────────
+  - id: "f2"
+    path_mode: "relative"
+    relative_path: "README.md"
+    type: "markdown"
+    modifications:
+      - id: "m1"
+        description: "Reescreve a seção de Configuração"
+        strategy: "replace_section"
+        location:
+          heading: "## Configuração"
+          include_heading: true
+        new_content: |
+          ## Configuração
+
+          Defina as variáveis no arquivo `.env`:
+          - `LOG_LEVEL`: nível de log (DEBUG, INFO, WARNING). Padrão: INFO.
+          - `SECRET_KEY`: chave secreta da aplicação. Obrigatória.
+
+  # ── JSON: operações por caminho (jmespath). Caminho Windows usa "\\" ───────
+  - id: "f3"
+    path_mode: "absolute"
+    absolute_path: "C:\\projetos\\meu_app\\config\\settings.json"
+    type: "json"
+    modifications:
+      - id: "m1"
+        description: "Atualiza a versão da API"
+        strategy: "set_json_path"
+        location:
+          path: "api.version"
+        value: "2.1.0"
+
+      - id: "m2"
+        description: "Adiciona uma feature flag ao array de features"
+        strategy: "append_json_array"
+        location:
+          path: "features"
+        value:
+          name: "enhanced_logging"
+          enabled: false
+
+      - id: "m3"
+        description: "Remove configuração legada"
+        strategy: "delete_json_path"
+        location:
+          path: "legacy.old_config"
+
+  # ── JavaScript via TEXTO: mecanismo universal (independe da linguagem) ─────
+  - id: "f4"
+    path_mode: "relative"
+    relative_path: "web/static/app.js"
+    type: "text"
+    language: "javascript"
+    modifications:
+      - id: "m1"
+        description: "Substitui o corpo de initApp usando janela de contexto"
+        strategy: "replace_context_block"
+        location:
+          before: "function initApp() {"
+          after: "}"
+          occurrence: 1
+        new_content: |
+          function initApp() {
+            console.log("App iniciado");
+            setupRoutes();
+            return true;
+          }
+
+  # ── Criação de arquivo novo: unifica "entregar código completo" + patch ────
+  - id: "f5"
+    path_mode: "relative"
+    relative_path: "src/utils/health.py"
+    type: "python"
+    modifications:
+      - id: "m1"
+        description: "Cria módulo de health-check do zero"
+        strategy: "create_file"
+        content: |
+          """Health-check simples da aplicação."""
+
+
+          def is_healthy() -> bool:
+              """Retorna True se a aplicação está operacional."""
+              return True

@@ -18,7 +18,11 @@
 
 - **Dry run** — Execução simulada: toda a lógica de localização e patch roda, mas nenhum arquivo é escrito em disco. Retorna o mesmo resultado que a execução real mostraria.
 
-- **Rollback** — Restauração de todos os arquivos afetados ao estado anterior à aplicação, a partir do backup criado pelo `backup_manager` antes da execução.
+- **Rollback** — Restauração de todos os arquivos afetados ao estado anterior à aplicação, a partir do backup criado pelo `backup_manager` antes da execução. Pode ser **automático** (disparado pelo `patch_engine` quando uma modificação falha com `stop_on_error`) ou **manual** (via `python -m src rollback <timestamp>`, que lê o `manifest.txt` da sessão de backup).
+
+- **Rollback atômico** — Garantia de que uma instrução é "tudo ou nada": se qualquer arquivo falhar no meio da execução, os arquivos já escritos são revertidos e os criados são removidos, deixando o projeto exatamente como estava. Implementado em F1 no `patch_engine` + `backup_manager`.
+
+- **Guarda de contenção** — Verificação do `file_locator`, no modo `relative`, de que o caminho resolvido não escapa da pasta raiz (`..` ou caminhos que sairiam do projeto são rejeitados). Impede que uma instrução gerada por IA escreva fora do projeto sem o usuário ter escolhido explicitamente o modo `absolute`.
 
 - **Root path / pasta raiz** — Pasta base do projeto do usuário. Definida na GUI ou via `--root` no CLI. Usada para resolver caminhos relativos da instrução (`root_path + relative_path`).
 
@@ -40,19 +44,21 @@
 
 - **instruction_validator** — Módulo que valida o dicionário Python contra o JSON Schema. Lança `ValidationError` com caminho do campo inválido se a instrução não for conformante.
 
-- **file_locator** — Módulo que resolve o caminho final de cada arquivo (combinando `root_path` com `relative_path` ou usando `absolute_path` diretamente) e verifica existência e permissões.
+- **file_locator** — Módulo que resolve o caminho final de cada arquivo (combinando `root_path` com `relative_path` ou usando `absolute_path` diretamente) e verifica existência. Aplica a **guarda de contenção** no modo relativo (o caminho resolvido não pode escapar da pasta raiz) e aceita a inexistência do arquivo quando todas as suas modificações são de criação.
 
 - **backup_manager** — Módulo que cria cópia timestampada (`backups/<YYYYMMDD_HHMMSS>/`) de todos os arquivos listados na instrução antes de qualquer escrita. Restaura sob demanda.
 
 - **diff_renderer** — Módulo que gera unified diff legível entre conteúdo original e conteúdo resultante de cada arquivo. Usado para prévia na GUI e output no CLI.
 
-- **BaseStrategy** — Classe abstrata (ABC) que define a interface comum a toda strategy: `find_location()` e `apply()`. Importada pelo `patch_engine` para seleção dinâmica.
+- **BaseStrategy** — Classe abstrata (ABC) que define a interface comum a toda strategy: um único método `apply(source, modification) -> str` que **localiza e aplica** a modificação num passo (DEC-009). Importada pelo `patch_engine` via registry para seleção dinâmica. *(Nota: a separação conceitual `find_location()`/`apply()` da F0 foi unificada em `apply()`; a pré-checagem de confiança da GUI virá do dry-run por modificação.)*
 
 - **python_strategy** — Strategy para arquivos `.py` usando `libcst`. Suporta: `replace_function`, `replace_method`, `replace_class`.
 
 - **text_strategy** — Strategy para `.txt`, `.md` e `.py` (operações textuais genéricas). Suporta: `insert_after_pattern`, `insert_before_pattern`, `replace_context_block`, `replace_line_pattern`, `replace_section`.
 
 - **json_strategy** — Strategy para `.json` usando `jmespath` para navegação. Suporta: `set_json_path`, `append_json_array`, `delete_json_path`.
+
+- **file_strategy** — Strategy de arquivo inteiro (DEC-008), independente de tipo. Suporta: `create_file` (cria arquivo novo a partir de `content`) e `replace_file` (substitui todo o conteúdo por `new_content`). Não usa `location`.
 
 ---
 

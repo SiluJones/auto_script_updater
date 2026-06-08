@@ -164,3 +164,66 @@ Toda instrução inclui o campo `format_version: "1.0"` no cabeçalho. A ferrame
 - O prompt padrão precisa ser atualizado ao mudar o schema.
 - O `instruction_validator.py` verifica `format_version` como primeiro passo, antes de qualquer outra validação.
 - Migração de schema (v1 → v2) é item de backlog para F4.
+
+---
+
+## DEC-008 — Estratégias `create_file` e `replace_file` (modos unificados)
+**Data:** 2026-06-08 · **Status:** aceita
+
+### Contexto
+O consumidor real da ferramenta é o próprio fluxo de transferência de contexto: ao fim de uma sessão, a IA pode emitir uma instrução em vez de entregar código para colar à mão. Esse fluxo tem dois modos: (1) **criar** arquivos/projeto do zero; (2) aplicar **patch cirúrgico** em arquivos existentes. Sem uma estratégia de arquivo inteiro, só o modo (2) seria possível, e o usuário continuaria colando arquivos novos manualmente.
+
+### Decisão
+Adicionar duas estratégias ao schema v1: `create_file` (cria arquivo novo a partir de `content`) e `replace_file` (substitui todo o conteúdo por `new_content`). Nenhuma exige `location`. O `file_locator` passa a aceitar a inexistência do arquivo quando *todas* as modificações dele são de criação.
+
+### Alternativas consideradas
+- **Só patch (sem criação)** — manteria o copia-e-cola manual para arquivos novos → derrota parte do propósito.
+- **Ferramenta separada para scaffolding** — duplicaria parsing/validação/backup → descartado; melhor unificar no mesmo schema e motor.
+
+### Consequências
+- Uma única instrução pode criar um projeto inteiro (vários `create_file`) ou fazer um patch fino — mesmo schema, mesmo motor, mesmo backup/rollback.
+- `create_file` sobre arquivo existente é tratado como sobrescrita (com backup), tornando a reaplicação de uma instrução idempotente e segura.
+- O total de estratégias passa de 11 (F0) para **13**.
+
+---
+
+## DEC-009 — `strategy` como fonte única do `location`; papéis Python explícitos; interface `apply()` única
+**Data:** 2026-06-08 · **Status:** aceita · **Refina:** DEC-001, DEC-002
+
+### Contexto
+O schema conceitual da F0 (HISTORICO §5) previa um campo `location.type` redundante com o `strategy` (ex.: `strategy: replace_function` + `location.type: function_name`). Redundância gera divergência e bugs (os dois podem discordar). Além disso, a interface conceitual da estratégia (`find_location()` + `apply()`) foi pensada para alimentar o indicador de confiança da GUI antes de aplicar.
+
+### Decisão
+1. **Remover `location.type`.** O campo `strategy` é a fonte única de como interpretar `location`. O schema valida o formato de `location` por estratégia via ramos `allOf/if/then`.
+2. **Papéis Python explícitos:** `replace_function` (função de módulo; `class_name` opcional para função aninhada em classe), `replace_method` (método; `class_name` **obrigatório**), `replace_class` (classe inteira).
+3. **Interface única `apply(source, modification) -> str`** na `BaseStrategy` (localiza e aplica num passo). A pré-checagem de confiança da GUI (🟢/🟡/🔴, F2) será derivada de um **dry-run por modificação** (o `patch_engine` já produz `ModificationResult.ok/error`), evitando duplicar a lógica de localização.
+
+### Alternativas consideradas
+- **Manter `location.type`** — mais explícito no papel, mas redundante e propenso a discordar do `strategy` → descartado (princípio "uma fonte de verdade").
+- **Manter `find_location()` separado** — necessário se a GUI precisasse localizar sem aplicar; mas o dry-run cobre isso sem duplicação → descartado por ora (revisitar se a GUI exigir granularidade maior).
+
+### Consequências
+- Schema mais enxuto e sem estado redundante; menos chance de instrução inconsistente.
+- O nome da estratégia carrega semântica suficiente para a ferramenta e para a IA geradora.
+- Divergência consciente do schema conceitual da F0: o prompt padrão da IA não deve emitir `location.type`.
+
+---
+
+## DEC-010 — Independência de linguagem via contexto; `requirements` em camadas
+**Data:** 2026-06-08 · **Status:** aceita · **Refina:** DEC-003
+
+### Contexto
+Pergunta de produto: a ferramenta pode ser "independente do tipo de arquivo ou linguagem"? As estratégias de janela de contexto (`replace_context_block`) e regex operam sobre **texto cru** — funcionam em qualquer linguagem, exatamente como o *apply_patch* da OpenAI localiza por contexto. libcst (Python) e jmespath (JSON) dão precisão semântica, mas são reforços, não requisitos. Além disso, a meta de longo prazo (F4) inclui usar o core como biblioteca pura, sem a dependência pesada do Qt.
+
+### Decisão
+1. **Multilinguagem por contexto:** `type: "text"` é o caminho universal; qualquer linguagem usa `replace_context_block`/`*_pattern`. Um campo opcional `language` carrega a linguagem real (para syntax highlight futuro). Localização semântica multilinguagem (tree-sitter) fica para F4.
+2. **`requirements` em camadas:** `requirements.txt` (núcleo, sem Qt: PyYAML, jsonschema, libcst, jmespath, colorama) + `requirements-gui.txt` (PySide6) + `requirements-dev.txt` (pytest, pytest-qt, ruff, black). Assim a F1 e os testes rodam leves e o core fica destacável do Qt.
+
+### Alternativas consideradas
+- **Exigir parser semântico por linguagem desde já** — inviável para N linguagens; tree-sitter é a via correta, mas é trabalho de F4 → adiado.
+- **`requirements.txt` único com Qt** — acoplaria o núcleo ao Qt e pesaria os testes → descartado.
+
+### Consequências
+- A ferramenta aceita qualquer linguagem via contexto já na F1; o ponto forte do fluxo é que o mesmo modelo escreve o código e a instrução, então escolhe âncoras de contexto únicas com conhecimento perfeito.
+- Instalação mínima (`requirements.txt`) basta para CLI e testes; a GUI é um opt-in (`requirements-gui.txt`).
+- Abre caminho limpo para a extensão VS Code / core-as-library da F4.

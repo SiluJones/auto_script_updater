@@ -6,42 +6,38 @@
 ---
 
 ## Versão Atual
-**[0.0.1-alpha]** — 2026-06-03 — Concepção e design arquitetural concluídos; código zero.
+**[0.1.0-alpha]** — 2026-06-08 — F1 concluída: motor de execução + CLI funcionais e testados (42/42 testes verdes).
 
 ## ✅ Funcionando
-- Documentação completa de contexto gerada e pronta para uso nas próximas sessões.
-- Arquitetura definida: módulos, responsabilidades, interfaces entre componentes.
-- Stack tecnológica selecionada e justificada (Python 3.11, PySide6, libcst, PyYAML, jsonschema, jmespath).
-- Schema conceitual do arquivo de instrução YAML v1.0 definido.
-- Onze estratégias de modificação especificadas para 4 tipos de arquivo.
-- Sete decisões arquiteturais documentadas (DEC-001 a DEC-007).
-- Roadmap em 5 fases (F0–F4) com critérios de conclusão.
+- **CLI completo** (`python -m src`): `validate`, `apply` (com prévia em dry-run + confirmação) e `rollback <timestamp>`.
+- **Intake**: parser YAML/JSON (com fallback de encoding) + validador contra JSON Schema com `format_version` e erros descritivos por caminho de campo.
+- **13 estratégias** aplicando corretamente:
+  - Python (libcst): `replace_function`, `replace_method`, `replace_class` — escopo léxico correto e formatação preservada.
+  - Texto universal (`re`): `insert_after_pattern`, `insert_before_pattern`, `replace_line_pattern`, `replace_context_block`.
+  - Markdown: `replace_section`.
+  - JSON (jmespath + navegador): `set_json_path`, `append_json_array`, `delete_json_path`.
+  - Arquivo inteiro: `replace_file`, `create_file`.
+- **Resolução de caminhos** relative/absolute com guarda de contenção (relativo não escapa da raiz).
+- **Backup obrigatório** timestampado (DEC-006) + **rollback atômico** automático em falha e rollback manual por timestamp.
+- **Diff colorido** (unified diff, colorama) na prévia e no resultado.
+- 42 testes unitários e de integração, todos verdes.
 
 ## 🔧 Em Progresso
-- Nada em progresso — projeto em transição de design para implementação.
+- Nada em progresso — F1 fechada; aguardando início da F2 (GUI).
 
 ## ❌ Quebrado / Com Problema
-- Nenhum — projeto não iniciado.
+- Nenhum conhecido.
 
 ## 📋 Backlog (curto prazo — itens acionáveis)
-- [ ] Criar estrutura de pastas `auto_script_updater/` conforme CONTEXT.md.
-- [ ] Criar `requirements.txt` (PySide6, libcst, PyYAML, jsonschema, jmespath) e `requirements-dev.txt` (pytest, pytest-qt, ruff, black).
-- [ ] Implementar `src/schemas/instruction_v1.schema.json` — schema JSON completo e validável.
-- [ ] Implementar `src/core/instruction_parser.py` — carrega YAML, retorna dict validado.
-- [ ] Implementar `src/core/instruction_validator.py` — valida dict contra schema.
-- [ ] Implementar `src/core/file_locator.py` — resolve caminhos e verifica existência.
-- [ ] Implementar `src/core/backup_manager.py` — backup timestampado e restauração.
-- [ ] Implementar `src/strategies/text_strategy.py` — estratégias de texto genérico.
-- [ ] Implementar `src/strategies/python_strategy.py` — estratégias libcst.
-- [ ] Implementar `src/strategies/json_strategy.py` — estratégias jmespath.
-- [ ] Implementar `src/core/patch_engine.py` — orquestrador com transação.
-- [ ] Implementar `src/core/diff_renderer.py` — unified diff para prévia.
-- [ ] Escrever fixtures de teste e testes unitários para cada strategy.
-- [ ] Testar ciclo completo CLI: instrução YAML → modificações aplicadas → backup criado.
+- [ ] Rodar `ruff` + `black` no código (config já em `pyproject.toml`) e corrigir o que apontarem.
+- [ ] Adicionar fixtures de borda em `tests/fixtures/`: arquivo CP-1252, arquivo com CRLF, regex com múltiplas ocorrências, contexto ambíguo.
+- [ ] Iniciar F2: `src/gui/main_window.py` (esqueleto da janela + orquestração da pilha existente).
+- [ ] Derivar indicador de confiança por modificação (🟢/🟡/🔴) a partir do dry-run por modificação (já há `ModificationResult.ok/error`).
 
 ## 📁 Arquivos Críticos (não mexer sem contexto)
-- `src/schemas/instruction_v1.schema.json` — contrato do arquivo de instrução; mudanças quebram retrocompatibilidade com todas as instruções já geradas → ver DEC-007 antes de alterar.
-- `src/core/patch_engine.py` — orquestra toda a execução; lógica de transação e rollback; ponto central de risco.
+- `src/schemas/instruction_v1.schema.json` — contrato do arquivo de instrução; mudanças quebram retrocompatibilidade com instruções já geradas → ver DEC-007 e DEC-009 antes de alterar.
+- `src/core/patch_engine.py` — orquestra toda a execução; lógica de transação e rollback atômico; ponto central de risco.
+- `src/core/backup_manager.py` — base do rollback; o formato do `manifest.txt` é lido pelo `rollback` do CLI.
 
 ## 💬 Última Sessão
-**2026-06-03** — Sessão de concepção: projeto idealizado, stack pesquisada e validada, arquitetura definida, schema de instrução projetado, estratégias de modificação especificadas, 7 decisões ADR documentadas, roadmap completo criado, toda a documentação gerada. Próximo passo imediato: criar estrutura de pastas e iniciar pelo `instruction_v1.schema.json` + `instruction_parser.py`.
+**2026-06-08** — Implementada a F1 inteira: schema + parser + validator, as 13 estratégias (Python/libcst, texto/contexto universal, markdown, JSON/jmespath, arquivo inteiro), file_locator com guarda de contenção, backup_manager com rollback atômico e por timestamp, diff_renderer colorido, patch_engine (transação + dry-run + precedência de settings) e CLI (`validate`/`apply`/`rollback`). 42 testes verdes + smoke test ponta a ponta. Três decisões novas (DEC-008/009/010) e alinhamento dos nomes de módulo ao contrato F0. Próximo passo: F2 (GUI PySide6) reusando a mesma pilha.

@@ -1,0 +1,278 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "auto-script-updater/instruction_v1.schema.json",
+  "title": "Instrução do Atualizador Automático de Scripts (v1)",
+  "description": "Contrato do arquivo de instrução gerado por IA. Ver DEC-001 (localização sem número de linha), DEC-004 (YAML canônico), DEC-007 (versionamento) e GLOSSARY.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format_version", "description", "files"],
+  "properties": {
+    "format_version": {
+      "type": "string",
+      "pattern": "^1\\.[0-9]+$",
+      "description": "Versão do schema. Esta ferramenta aceita a família 1.x (DEC-007)."
+    },
+    "generated_by": {
+      "type": "string",
+      "description": "IA que gerou a instrução (ex.: 'claude'). Opcional."
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "Timestamp ISO 8601 da geração. Opcional."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Resumo legível do que a instrução faz."
+    },
+    "session_reference": {
+      "type": "string",
+      "description": "Referência à sessão de origem. Opcional."
+    },
+    "settings": { "$ref": "#/definitions/settings" },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/file" }
+    }
+  },
+  "definitions": {
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "backup": { "type": "boolean", "default": true, "description": "Criar backup antes de escrever (DEC-006)." },
+        "dry_run": { "type": "boolean", "default": false, "description": "Simular sem escrever em disco." },
+        "stop_on_error": { "type": "boolean", "default": true, "description": "Parar e reverter tudo se uma modificação falhar." },
+        "encoding": { "type": "string", "default": "utf-8", "description": "Encoding padrão para todos os arquivos." }
+      }
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path_mode", "type", "modifications"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "description": "Identificador único do arquivo dentro da instrução." },
+        "path_mode": { "type": "string", "enum": ["relative", "absolute"], "description": "Como o caminho é especificado." },
+        "relative_path": { "type": ["string", "null"], "description": "Caminho relativo ao root_path (quando path_mode = relative)." },
+        "absolute_path": { "type": ["string", "null"], "description": "Caminho absoluto (quando path_mode = absolute)." },
+        "type": { "type": "string", "enum": ["python", "markdown", "json", "text"], "description": "Categoria do arquivo. 'text' é o universal: qualquer linguagem usa estratégias de contexto/regex." },
+        "language": { "type": "string", "description": "Metadado opcional: linguagem real quando type = 'text' (ex.: 'javascript', 'rust'). Uso futuro: syntax highlight no diff." },
+        "encoding": { "type": "string", "description": "Override do encoding global só para este arquivo. Opcional." },
+        "modifications": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/modification" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["path_mode"], "properties": { "path_mode": { "const": "relative" } } },
+          "then": { "required": ["relative_path"], "properties": { "relative_path": { "type": "string", "minLength": 1 } } }
+        },
+        {
+          "if": { "required": ["path_mode"], "properties": { "path_mode": { "const": "absolute" } } },
+          "then": { "required": ["absolute_path"], "properties": { "absolute_path": { "type": "string", "minLength": 1 } } }
+        }
+      ]
+    },
+    "modification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "strategy"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "description": "Identificador único da modificação dentro do arquivo." },
+        "description": { "type": "string", "minLength": 1, "description": "O que esta modificação faz (referência humana; pode citar número de linha aqui, nunca no location)." },
+        "strategy": {
+          "type": "string",
+          "description": "Algoritmo de localização+aplicação. Fonte única de como interpretar 'location'.",
+          "enum": [
+            "replace_function",
+            "replace_method",
+            "replace_class",
+            "insert_after_pattern",
+            "insert_before_pattern",
+            "replace_context_block",
+            "replace_line_pattern",
+            "replace_section",
+            "set_json_path",
+            "append_json_array",
+            "delete_json_path",
+            "replace_file",
+            "create_file"
+          ]
+        },
+        "location": { "type": "object", "description": "Localizador. Formato definido pela 'strategy'. Ausente em replace_file/create_file." },
+        "new_content": { "type": "string", "description": "Conteúdo novo que SUBSTITUI algo existente." },
+        "content": { "type": "string", "description": "Conteúdo novo a INSERIR/CRIAR." },
+        "value": { "description": "Valor JSON (qualquer tipo) para estratégias JSON." }
+      },
+      "allOf": [
+        {
+          "$comment": "Python — função de módulo",
+          "if": { "required": ["strategy"], "properties": { "strategy": { "const": "replace_function" } } },
+          "then": {
+            "required": ["location", "new_content"],
+            "properties": {
+              "location": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string", "minLength": 1, "description": "Nome da função." },
+                  "class_name": { "type": ["string", "null"], "description": "Opcional; preencher só se a função estiver dentro de classe." }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "Python — método dentro de classe",
+          "if": { "required": ["strategy"], "properties": { "strategy": { "const": "replace_method" } } },
+          "then": {
+            "required": ["location", "new_content"],
+            "properties": {
+              "location": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["class_name", "name"],
+                "properties": {
+                  "class_name": { "type": "string", "minLength": 1, "description": "Nome da classe que contém o método." },
+                  "name": { "type": "string", "minLength": 1, "description": "Nome do método." }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "Python — classe inteira",
+          "if": { "required": ["strategy"], "properties": { "strategy": { "const": "replace_class" } } },
+          "then": {
+            "required": ["location", "new_content"],
+            "properties": {
+              "location": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name"],
+                "properties": { "name": { "type": "string", "minLength": 1, "description": "Nome da classe." } }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "Texto — inserção por padrão (antes/depois). Universal.",
+          "if": { "required": ["strategy"], "properties": { "strategy": { "enum": ["insert_after_pattern", "insert_before_pattern"] } } },
+          "then": {
+            "required": ["location", "content"],
+            "properties": {
+              "location": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["pattern"],
+                "properties": {
+                  "pattern": { "type": "string", "minLength": 1, "description": "Regex que casa a linha-âncora." },
+                  "occurrence": { "type": "integer", "minimum": 1, "default": 1, "description": "Qual ocorrência usar (1-indexed)." }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "Texto — substituir a linha que casa o regex. Universal.",
+          "if": { "required": ["strategy"], "properties": { "strategy": { "const": "replace_line_pattern" } } },
+          "then": {
+            "required": ["location", "new_content"],
+            "properties": {
+              "location": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["pattern"],
+                "properties": {
+                  "pattern": { "type": "string", "minLength": 1, "description": "Regex que casa exatamente a linha alvo." },
+                  "occurrence": { "type": "integer", "minimum": 1, "default": 1, "description": "Qual ocorrência usar (1-indexed)." }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "Texto — substituir bloco por janela de contexto. Universal (qualquer linguagem).",
+          "if": { "required": ["strategy"], "properties": { "strategy": { "const": "replace_context_block" } } },
+          "then": {
+            "required": ["location", "new_content"],
+            "properties": {
+              "location": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["before", "after"],
+                "properties": {
+                  "before": { "type": "string", "minLength": 1, "description": "Linha(s) única(s) imediatamente antes do bloco alvo." },
+                  "after": { "type": "string", "minLength": 1, "description": "Linha(s) única(s) imediatamente depois do bloco alvo." },
+                  "occurrence": { "type": "integer", "minimum": 1, "default": 1, "description": "Qual ocorrência do par before/after usar." }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "Markdown — substituir seção por heading.",
+          "if": { "required": ["strategy"], "properties": { "strategy": { "const": "replace_section" } } },
+          "then": {
+            "required": ["location", "new_content"],
+            "properties": {
+              "location": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["heading"],
+                "properties": {
+                  "heading": { "type": "string", "minLength": 1, "description": "Texto exato do heading (ex.: '## Configuração')." },
+                  "include_heading": { "type": "boolean", "default": true, "description": "true = substitui heading + conteúdo; false = só o conteúdo abaixo dele." }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "JSON — set/append por caminho jmespath.",
+          "if": { "required": ["strategy"], "properties": { "strategy": { "enum": ["set_json_path", "append_json_array"] } } },
+          "then": {
+            "required": ["location", "value"],
+            "properties": {
+              "location": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path"],
+                "properties": { "path": { "type": "string", "minLength": 1, "description": "Caminho jmespath (ex.: 'api.version' ou 'features')." } }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "JSON — deletar nó por caminho (sem conteúdo).",
+          "if": { "required": ["strategy"], "properties": { "strategy": { "const": "delete_json_path" } } },
+          "then": {
+            "required": ["location"],
+            "properties": {
+              "location": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path"],
+                "properties": { "path": { "type": "string", "minLength": 1, "description": "Caminho jmespath do nó a remover." } }
+              }
+            }
+          }
+        },
+        {
+          "$comment": "Arquivo inteiro — substituir todo o conteúdo (não precisa de location).",
+          "if": { "required": ["strategy"], "properties": { "strategy": { "const": "replace_file" } } },
+          "then": { "required": ["new_content"] }
+        },
+        {
+          "$comment": "Arquivo inteiro — criar arquivo novo (não precisa de location).",
+          "if": { "required": ["strategy"], "properties": { "strategy": { "const": "create_file" } } },
+          "then": { "required": ["content"] }
+        }
+      ]
+    }
+  }
+}

@@ -29,17 +29,8 @@ A ferramenta deve ter um formato de instrução bem definido que a IA aprende a 
 
 ## 🤖 Ideias Ativas — Assistente
 
-### 2026-06-03 — Modo dry run / simulação
-Executar toda a lógica de localização e patch sem escrever nada em disco. Mostrar o resultado completo como se tivesse aplicado. Útil para validar instruções antes de usar em produção. Já planejado no schema (`dry_run: true`) e na GUI (checkbox).
-
-### 2026-06-03 — Validação de unicidade do localizador pré-execução
-Antes de qualquer escrita, verificar que cada localizador (regex, nome de função, heading) casa exatamente uma vez no arquivo alvo. Se casar zero ou mais de uma, bloquear e reportar com detalhes (qual arquivo, qual modification id, quantas ocorrências encontradas).
-
 ### 2026-06-03 — Indicador de confiança por modificação na GUI
 Durante a fase de validação, exibir um ícone de status para cada modificação: 🟢 localizador único e arquivo encontrado; 🟡 aviso (ex: arquivo encontrado mas regex é ambíguo); 🔴 erro (arquivo não encontrado, localizador inválido). Usuário não aplica sem ver todos os itens verdes.
-
-### 2026-06-03 — Modo transação com rollback automático em falha
-Se `stop_on_error: true` e qualquer modificação falhar, reverter AUTOMATICAMENTE todas as modificações já aplicadas na sessão usando o backup. Garante que o projeto nunca fica em estado parcialmente modificado. Crítico para instruções com 10+ modificações.
 
 ### 2026-06-03 — Leitura de instrução direto da área de transferência
 Botão "Colar instrução" que lê YAML diretamente da clipboard. Útil quando a IA gerou a instrução no chat e o usuário não quer salvar em arquivo separado — reduz fricção do fluxo principal.
@@ -74,13 +65,18 @@ O formato `*** Begin Patch / *** End Patch` (usado por Codex, GPT-5.1, opencode)
 ### 2026-06-03 — Anchor comments opcionais no código-alvo
 Modo opcional onde o usuário insere comentários especiais no código (`# ASU_ANCHOR: feature_login`) que servem como marcadores de localização ultra-estáveis. A IA referencia o anchor pelo nome; a ferramenta localiza por busca de string exata. Complementa as estratégias existentes para casos onde o código é muito dinâmico.
 
-### 2026-06-03 — CLI funcional sem GUI (F1)
-`python -m src instrucao.yaml --root C:\meu_projeto [--dry-run]` — aplicar modificações via linha de comando sem abrir a GUI. Útil para integração em scripts e automação. Planejado em F1 antes de construir a GUI em F2.
+### 2026-06-08 — Localização semântica multilinguagem via tree-sitter (F4)
+Hoje a precisão semântica existe só para Python (libcst) e JSON (jmespath); demais linguagens usam janela de contexto/regex. tree-sitter tem gramáticas para dezenas de linguagens e permitiria estratégias semânticas (`replace_function`/`replace_class`) em JS, Go, Rust, etc. Encaixa como reforço opcional sobre o mecanismo universal de contexto. Registrado a partir da DEC-010. Prioridade F4.
 
 ---
 
 ## ✅ Concluídas
-*(nenhuma ainda — projeto em fase inicial)*
+- **Modo dry run / simulação** — implementado em F1 (`--dry-run`; o `patch_engine` roda toda a lógica em memória e calcula os diffs sem escrever).
+- **Modo transação com rollback automático em falha** — implementado em F1 (com `stop_on_error`, qualquer falha reverte tudo via `backup_manager.restore_all`).
+- **Validação de unicidade/existência do localizador pré-escrita** — implementado em F1 (cada estratégia confere nº de ocorrências/match e bloqueia com erro acionável antes de gravar; falha de uma modificação não deixa o arquivo pela metade).
+- **CLI funcional sem GUI (F1)** — implementado (`python -m src` com `validate`/`apply`/`rollback`).
+- **`requirements` em camadas (núcleo sem Qt)** — implementado em F1 (DEC-010): `requirements.txt` + `requirements-gui.txt` + `requirements-dev.txt`.
+- **Estratégias de arquivo inteiro (`create_file`/`replace_file`)** — implementadas em F1 (DEC-008): permitem criar um projeto do zero ou fazer patch cirúrgico na mesma instrução.
 
 ---
 

@@ -1,0 +1,25 @@
+[project]
+name = "auto-script-updater"
+version = "0.0.1"
+description = "Aplica instruções de modificação geradas por IA a arquivos do projeto (.py, .md, .json, .txt e qualquer linguagem via contexto)."
+requires-python = ">=3.11"
+readme = "README.md"
+
+[tool.pytest.ini_options]
+# A raiz do projeto entra no sys.path para que 'import src...' funcione.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Conjunto pragmático: erros, imports, bugbear, pyupgrade.
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E731"]  # lambdas pontuais no diff_renderer
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]

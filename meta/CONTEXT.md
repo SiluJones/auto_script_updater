@@ -31,10 +31,11 @@ auto_script_updater/
 │   │   ├── backup_manager.py          # Cria backup timestampado; restaura sob demanda
 │   │   └── diff_renderer.py           # Gera unified diff legível (prévia GUI + output CLI)
 │   ├── strategies/
-│   │   ├── base_strategy.py           # ABC: interface find_location() + apply()
+│   │   ├── base_strategy.py           # ABC: interface apply() (localiza + aplica num passo)
 │   │   ├── python_strategy.py         # Estratégias Python via libcst (CST)
 │   │   ├── text_strategy.py           # Estratégias texto genérico: regex + janela de contexto
-│   │   └── json_strategy.py           # Estratégias JSON: jmespath set/append/delete
+│   │   ├── json_strategy.py           # Estratégias JSON: jmespath set/append/delete
+│   │   └── file_strategy.py           # Arquivo inteiro: create_file / replace_file (DEC-008)
 │   ├── gui/
 │   │   ├── main_window.py             # Janela principal + orquestração de UI
 │   │   ├── file_tree_panel.py         # Árvore de arquivos afetados (QTreeWidget + status)
@@ -42,15 +43,17 @@ auto_script_updater/
 │   │   └── root_picker.py             # Seletor de pasta raiz com histórico
 │   ├── schemas/
 │   │   └── instruction_v1.schema.json # JSON Schema — contrato do arquivo de instrução v1.x
-│   └── __main__.py                    # Entry point: `python -m src [instrucao.yaml] [--root ...]`
+│   └── __main__.py                    # Entry point/CLI: `python -m src {validate|apply|rollback} ...`
 ├── tests/
 │   ├── fixtures/                      # Arquivos de referência para testes
 │   ├── test_strategies.py             # Testes unitários por strategy
 │   ├── test_patch_engine.py           # Testes de integração do engine
 │   └── test_instruction_parser.py     # Testes do parser + validator
 ├── backups/                           # Backups automáticos por timestamp (gitignored)
-├── requirements.txt
-└── requirements-dev.txt               # pytest, pytest-qt, ruff, black
+├── pyproject.toml                     # Config de pytest, ruff e black
+├── requirements.txt                   # Núcleo (sem Qt): PyYAML, jsonschema, libcst, jmespath, colorama
+├── requirements-gui.txt               # Camada GUI: PySide6
+└── requirements-dev.txt               # GUI + pytest, pytest-qt, ruff, black
 ```
 
 ## Como o Arquivo de Instrução Funciona (CRÍTICO)
@@ -64,8 +67,8 @@ instrução
     ├── id, path_mode ("relative" | "absolute"), caminho
     ├── type ("python" | "markdown" | "json" | "text")
     └── modifications[]
-        ├── id, description, strategy (nome do algoritmo)
-        ├── location (tipo + identificador único, sem número de linha)
+        ├── id, description, strategy (nome do algoritmo — fonte única de como ler o location)
+        ├── location (identificador único conforme a strategy, sem número de linha; ausente em create_file/replace_file)
         └── new_content / content / value (o conteúdo a aplicar)
 ```
 
@@ -89,6 +92,8 @@ instrução
 | `set_json_path` | JSON | Caminho jmespath (ex: `config.database.host`) |
 | `append_json_array` | JSON | Caminho jmespath do array + valor a inserir |
 | `delete_json_path` | JSON | Caminho jmespath do nó a remover |
+| `create_file` | Qualquer | Sem localização — cria arquivo novo a partir de `content` (DEC-008) |
+| `replace_file` | Qualquer | Sem localização — substitui todo o conteúdo por `new_content` (DEC-008) |
 
 ## Convenções de Código
 - **Nomes:** snake_case, inglês (arquivos, funções, variáveis, classes)
@@ -105,6 +110,9 @@ instrução
 - PySide6 como framework GUI — ver DEC-005.
 - Backup obrigatório antes de qualquer escrita em disco — ver DEC-006.
 - Schema versionado com campo `format_version` — ver DEC-007.
+- Estratégias de arquivo inteiro (`create_file`/`replace_file`) unificam criar-do-zero e patch — ver DEC-008.
+- `strategy` é a fonte única de como interpretar `location` (sem `location.type`); interface da strategy é um `apply()` único — ver DEC-009.
+- Independência de linguagem via janela de contexto/regex; libcst/jmespath são reforços; `requirements` em camadas (núcleo sem Qt) — ver DEC-010.
 
 ## Armadilhas Conhecidas
 1. **Localizar por número de linha absoluto** — linhas se deslocam após qualquer inserção/deleção anterior no mesmo arquivo; em instruções com várias modificações, a taxa de falha é alta → usar estratégias semânticas (nome de função, heading, jmespath) ou janela de contexto; se inevitável usar posição textual, aplicar modificações do fim para o início do arquivo.
