@@ -4,9 +4,11 @@ Unificam os dois modos do fluxo de transferência de contexto: a IA pode emitir
 uma instrução que **cria o projeto inteiro** (vários ``create_file``) ou que faz
 um **patch cirúrgico** (estratégias semânticas/contexto). Ambas no mesmo schema.
 """
+
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from .base_strategy import BaseStrategy
 

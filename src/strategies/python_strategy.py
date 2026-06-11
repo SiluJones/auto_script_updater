@@ -5,13 +5,20 @@ espaçamento ao redor (libcst recalcula a indentação ao renderizar dentro do
 bloco pai; copiamos ``leading_lines`` do nó original para manter as linhas em
 branco que o separavam do vizinho).
 
+Semântica de decoradores (importante): a substituição é do nó COMPLETO —
+decoradores fazem parte da definição. Se a função original tem ``@decorator``
+e o ``new_content`` não o repete, o decorador é REMOVIDO junto. Para manter
+decoradores, inclua-os no ``new_content``.
+
 libcst é importado preguiçosamente: assim o restante do pacote (texto, JSON,
 arquivo) continua funcionando mesmo sem libcst instalado, e só estas três
 estratégias exigem a dependência.
 """
+
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from .base_strategy import BaseStrategy, StrategyError, get_location
 
@@ -116,12 +123,14 @@ class _PythonDefStrategy(BaseStrategy):
         if self.requires_class and not class_name:
             raise StrategyError(f"{self.name}: 'location.class_name' é obrigatório.")
 
-        replacement = _extract_single_def(
-            cst, modification.get("new_content", ""), want=self.kind
-        )
+        replacement = _extract_single_def(cst, modification.get("new_content", ""), want=self.kind)
         count, code = _transform(
-            cst, source, replacement,
-            target=name, kind=self.kind, class_name=class_name,
+            cst,
+            source,
+            replacement,
+            target=name,
+            kind=self.kind,
+            class_name=class_name,
         )
         if count == 0:
             alvo = f"{self.rotulo} '{name}'"

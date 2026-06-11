@@ -5,6 +5,7 @@ um dicionário Python. NÃO valida o conteúdo — isso é tarefa do
 ``instruction_validator`` (ver GLOSSARY.md). JSON é aceito por ser subconjunto
 de YAML (DEC-004).
 """
+
 from __future__ import annotations
 
 import logging

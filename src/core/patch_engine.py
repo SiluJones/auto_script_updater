@@ -9,16 +9,18 @@ calculados como se a aplicação tivesse ocorrido.
 Precedência de configuração: padrões < ``instruction.settings`` < argumentos
 explícitos passados a :func:`apply_instruction`.
 """
+
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
+from ..strategies import StrategyError, get_strategy
 from . import diff_renderer
 from .backup_manager import BackupManager
 from .file_locator import FileLocatorError, ensure_ready, resolve_path
-from ..strategies import StrategyError, get_strategy
 
 # Padrões dos settings (o schema documenta os mesmos defaults, mas jsonschema
 # não os injeta — aplicamos aqui).
@@ -26,6 +28,15 @@ _DEFAULTS = {"backup": True, "dry_run": False, "stop_on_error": True, "encoding"
 
 # Encodings tentados ao ler arquivos-alvo (Armadilha #3).
 _READ_FALLBACK = ("utf-8", "cp1252")
+
+# BOMs que indicam encodings NÃO suportados (decodificá-los com cp1252 produziria
+# lixo com NULs e, em estratégias sem localizador, conversão silenciosa de encoding).
+_UNSUPPORTED_BOMS = (
+    (b"\xff\xfe\x00\x00", "UTF-32 LE"),
+    (b"\x00\x00\xfe\xff", "UTF-32 BE"),
+    (b"\xff\xfe", "UTF-16 LE"),
+    (b"\xfe\xff", "UTF-16 BE"),
+)
 
 
 @dataclass
@@ -61,7 +72,9 @@ class ApplyReport:
     rolled_back: bool = False
 
 
-def _effective_settings(instruction: Mapping[str, Any], overrides: Mapping[str, Any]) -> dict[str, Any]:
+def _effective_settings(
+    instruction: Mapping[str, Any], overrides: Mapping[str, Any]
+) -> dict[str, Any]:
     """Funde padrões, settings da instrução e overrides explícitos (não-None)."""
     settings = dict(_DEFAULTS)
     settings.update({k: v for k, v in (instruction.get("settings") or {}).items() if v is not None})
@@ -70,17 +83,47 @@ def _effective_settings(instruction: Mapping[str, Any], overrides: Mapping[str, 
 
 
 def _read_target(path: Path, encoding: str) -> tuple[str, str, str]:
-    """Lê o arquivo-alvo. Retorna (texto_em_\\n, encoding_usado, estilo_newline)."""
+    """Lê o arquivo-alvo. Retorna (texto_em_\\n, encoding_usado, estilo_newline).
+
+    Cuidados de encoding (Armadilha #3 + FIX-002):
+    - **BOM UTF-8** (padrão do Visual Studio em ``.cs``, comum no Windows): sem
+      tratamento, ``utf-8`` decodifica o BOM como ``\\ufeff`` no início do texto
+      — invisível no diff, mas faz localizadores na primeira linha falharem
+      misteriosamente. Detectamos o BOM e usamos ``utf-8-sig``; a gravação
+      preserva o BOM (roundtrip fiel).
+    - **UTF-16/32**: ``cp1252`` "decodificaria" os bytes sem erro, produzindo
+      texto com NULs intercalados — e estratégias sem localizador
+      (``replace_file``) converteriam o encoding do arquivo silenciosamente.
+      Rejeitamos com erro claro pedindo conversão para UTF-8.
+    - O estilo de newline é detectado no TEXTO decodificado (não nos bytes),
+      o que é correto para qualquer encoding.
+    """
     raw = path.read_bytes()
-    newline = "\r\n" if b"\r\n" in raw else "\n"
+
+    for bom, nome in _UNSUPPORTED_BOMS:
+        if raw.startswith(bom):
+            raise FileLocatorError(
+                f"{path}: arquivo em {nome} (BOM detectado). Encoding não suportado; "
+                "converta o arquivo para UTF-8 antes de aplicar a instrução."
+            )
+
+    has_utf8_bom = raw.startswith(b"\xef\xbb\xbf")
+    candidatos = (
+        ("utf-8-sig",)
+        if has_utf8_bom
+        else (encoding, *(_e for _e in _READ_FALLBACK if _e != encoding))
+    )
+
     last_error: UnicodeDecodeError | None = None
-    for enc in (encoding, *(_e for _e in _READ_FALLBACK if _e != encoding)):
+    for enc in candidatos:
         try:
             text = raw.decode(enc)
         except UnicodeDecodeError as exc:
             last_error = exc
             continue
-        # Normaliza para \n no processamento; o estilo original é reaplicado ao gravar.
+        # Detecta o estilo de quebra de linha no texto decodificado; normaliza
+        # para \n no processamento e reaplica o estilo original ao gravar.
+        newline = "\r\n" if "\r\n" in text else "\n"
         return text.replace("\r\n", "\n"), enc, newline
     raise FileLocatorError(
         f"Não foi possível decodificar {path} ({encoding}/cp1252)."
@@ -141,12 +184,20 @@ def apply_instruction(
             continue
 
         # 2) Ler conteúdo atual (ou vazio, se será criado).
-        if path.exists():
-            original, used_encoding, newline = _read_target(path, encoding)
-            existed = True
-        else:
-            original, used_encoding, newline = "", encoding, "\n"
-            existed = False
+        try:
+            if path.exists():
+                original, used_encoding, newline = _read_target(path, encoding)
+                existed = True
+            else:
+                original, used_encoding, newline = "", encoding, "\n"
+                existed = False
+        except FileLocatorError as exc:
+            report.ok = False
+            report.files.append(FileResult(file_id, str(path), "failed", error=str(exc)))
+            if stop:
+                _maybe_rollback(backup_mgr, wrote_anything, report)
+                return report
+            continue
 
         # 3) Aplicar modificações em sequência (reparse implícito: cada passo recebe o texto atual).
         current = original
@@ -159,15 +210,15 @@ def apply_instruction(
                 current = get_strategy(strat_name).apply(current, mod)
                 mod_results.append(ModificationResult(mod_id, strat_name, ok=True))
             except StrategyError as exc:
-                mod_results.append(
-                    ModificationResult(mod_id, strat_name, ok=False, error=str(exc))
-                )
+                mod_results.append(ModificationResult(mod_id, strat_name, ok=False, error=str(exc)))
                 file_failed = True
                 report.ok = False
                 if stop:
                     report.files.append(
                         FileResult(
-                            file_id, str(path), "failed",
+                            file_id,
+                            str(path),
+                            "failed",
                             error=f"Modificação '{mod_id}' falhou: {exc}",
                             modifications=mod_results,
                         )
@@ -178,8 +229,13 @@ def apply_instruction(
 
         if file_failed:
             report.files.append(
-                FileResult(file_id, str(path), "failed", error="Uma ou mais modificações falharam.",
-                           modifications=mod_results)
+                FileResult(
+                    file_id,
+                    str(path),
+                    "failed",
+                    error="Uma ou mais modificações falharam.",
+                    modifications=mod_results,
+                )
             )
             continue
 
@@ -202,8 +258,13 @@ def apply_instruction(
             except OSError as exc:
                 report.ok = False
                 report.files.append(
-                    FileResult(file_id, str(path), "failed",
-                               error=f"Falha ao gravar: {exc}", modifications=mod_results)
+                    FileResult(
+                        file_id,
+                        str(path),
+                        "failed",
+                        error=f"Falha ao gravar: {exc}",
+                        modifications=mod_results,
+                    )
                 )
                 if stop:
                     _maybe_rollback(backup_mgr, wrote_anything, report)
@@ -222,7 +283,9 @@ def apply_instruction(
     return report
 
 
-def _maybe_rollback(backup_mgr: BackupManager | None, wrote_anything: bool, report: ApplyReport) -> None:
+def _maybe_rollback(
+    backup_mgr: BackupManager | None, wrote_anything: bool, report: ApplyReport
+) -> None:
     """Reverte escritas já feitas, se houver backup; marca o relatório."""
     if backup_mgr is not None and wrote_anything:
         backup_mgr.restore_all()

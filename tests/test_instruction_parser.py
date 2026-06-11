@@ -1,4 +1,5 @@
 """Testes da camada de intake: parser, validator e validade do schema."""
+
 from __future__ import annotations
 
 from pathlib import Path

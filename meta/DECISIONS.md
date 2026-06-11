@@ -249,3 +249,60 @@ Manteve-se a convenção A (âncoras preservadas, `new_content` = miolo) em vez 
 
 ### Lição
 Numa ferramenta de patch, **falhar alto é obrigatório**: um resultado errado que não levanta erro é pior que uma exceção. Estratégias devem bloquear quando o resultado provável é inválido.
+
+---
+
+## DEC-011 — Unicidade implícita de localizadores (occurrence ausente exige match único)
+**Data:** 2026-06-10 · **Status:** aceita · **Implementa:** Armadilha #5 do CONTEXT
+
+### Contexto
+As estratégias por padrão/âncora (`insert_after_pattern`, `insert_before_pattern`, `replace_line_pattern`, `replace_context_block`) aceitavam um localizador que casasse N vezes e, com `occurrence` ausente (default 1), aplicavam na **primeira** ocorrência **silenciosamente**. Num arquivo com `import os` repetido ou duas funções `initApp`, a modificação podia cair no lugar errado sem nenhum sinal — exatamente o cenário que a Armadilha #5 do CONTEXT mandava bloquear, mas que nunca tinha virado código.
+
+### Decisão
+Semântica em duas vias, implementada no helper `_resolve_occurrence`:
+- **`occurrence` AUSENTE** → o localizador deve ser **único**. Se casa >1 vez, erro de ambiguidade que informa a contagem e ensina a saída ("especifique occurrence (1..N) ou torne o localizador mais específico").
+- **`occurrence` PRESENTE** (mesmo `= 1`) → escolha **posicional explícita**: valida apenas o intervalo. Quem escreve `occurrence: 1` está dizendo "a primeira, eu sei que há outras".
+A mesma regra vale para a âncora `before` do `replace_context_block`. `replace_section` ganhou regra análoga: heading duplicado → erro (não há `occurrence` para seções).
+
+### Alternativas consideradas
+- **Sempre exigir unicidade** (mesmo com occurrence explícito) — quebraria o uso legítimo de posicionamento (ex.: 2ª ocorrência de um marcador repetido) → descartado.
+- **Warning em vez de erro** — não existe canal de warning ainda (IDEAS); e silêncio com aviso perdido ainda corrompe → descartado por ora.
+
+### Consequências
+- Instruções antes "aceitas" com localizador ambíguo agora são **rejeitadas antes de escrever** — mudança de comportamento (por isso o salto para 0.2.0).
+- O prompt/guia da IA geradora deve preferir localizadores únicos e usar `occurrence` apenas quando a repetição é intencional.
+
+---
+
+## FIX-002 — BOM UTF-8 corrompia localização; UTF-16 virava lixo via cp1252
+**Data:** 2026-06-10 · **Status:** corrigido
+
+### Sintoma
+1. Arquivo UTF-8 **com BOM** (padrão do Visual Studio para `.cs`; comum no Windows): a leitura com `utf-8` decodificava o BOM como o caractere invisível `\ufeff` no início do texto. Consequência: localizadores na primeira linha (`^using System;$`, `^import os$`) **não casavam**, com erro confuso de "padrão não encontrado" — ou pior, modificações no início do arquivo posicionavam conteúdo em relação ao caractere fantasma.
+2. Arquivo **UTF-16/32**: `utf-8` falha, mas o fallback `cp1252` "decodifica" qualquer byte — o texto virava lixo com NULs intercalados. Estratégias com localizador falhavam barulhento (ok), mas `replace_file`/`create_file` (sem localizador) **converteriam o encoding do arquivo silenciosamente** para cp1252.
+
+### Causa raiz
+`_read_target` não inspecionava BOMs e detectava o estilo de newline nos **bytes crus** (o que também seria errado para UTF-16, onde `\r\n` é `\r\x00\n\x00`).
+
+### Correção (em `patch_engine._read_target`)
+- BOM UTF-8 detectado → decodifica com `utf-8-sig` e grava de volta com `utf-8-sig` (**BOM preservado**, roundtrip fiel — teste com `.cs` real).
+- BOMs UTF-16 LE/BE e UTF-32 LE/BE → **erro claro** pedindo conversão para UTF-8 (suporte nativo registrado em IDEAS se houver demanda).
+- Detecção de newline movida para o **texto decodificado** (correto para qualquer encoding).
+- De quebra, o engine passou a capturar erros de leitura/decodificação no fluxo normal de falha por arquivo (status `failed` + stop/rollback) — antes, a exceção **escapava** e derrubava o processo.
+
+### Lição
+O fallback permissivo (cp1252 aceita quase qualquer byte) é útil para legado, mas precisa de **portões na frente** (BOMs) para não transformar arquivos ilegíveis em "texto" plausível.
+
+---
+
+## FIX-003 — `replace_section` tratava headings dentro de code fences como seções
+**Data:** 2026-06-10 · **Status:** corrigido
+
+### Sintoma
+Num markdown com bloco de código contendo `## Algo` (ex.: documentação que mostra exemplos de markdown, README com YAML/markdown embutido), o `replace_section`: (a) podia encontrar o "heading" dentro do fence e substituir a coisa errada; (b) podia **encerrar a seção cedo demais** ao topar com um `## X` fenced — cortando a seção real pela metade, silenciosamente.
+
+### Correção
+Rastreio de estado `in_fence` (linhas iniciando com ``` ou ~~~, até 3 espaços de indentação) tanto na **busca do heading** quanto na **detecção do fim da seção**; linhas dentro de fences são invisíveis para a estratégia. Aproveitando, heading duplicado (fora de fences) passou a ser erro de ambiguidade (DEC-011), e a substituição da **última seção** (até EOF) ganhou teste.
+
+### Lição
+Markdown "de verdade" carrega código dentro; qualquer parser de estrutura markdown precisa ser fence-aware desde o primeiro dia.

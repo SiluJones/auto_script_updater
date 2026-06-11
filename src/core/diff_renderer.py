@@ -4,6 +4,7 @@ Usado para a prévia (GUI futura) e o output do CLI. Cores via colorama
 (verde = adição, vermelho = remoção, ciano = cabeçalho), com degradação
 graciosa: sem colorama instalado, sai texto puro.
 """
+
 from __future__ import annotations
 
 import difflib

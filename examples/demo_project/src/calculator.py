@@ -8,9 +8,7 @@ class Calculator:
         return a + b
 
     def divide(self, a, b):
-        """Divide a por b, com proteção contra divisão por zero."""
-        if b == 0:
-            raise ValueError("Divisão por zero não é permitida")
+        # versão ingênua: não trata divisão por zero
         return a / b
 
 

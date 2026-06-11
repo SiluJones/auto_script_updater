@@ -6,7 +6,7 @@
 ---
 
 ## Versão Atual
-**[0.1.1-alpha]** — 2026-06-10 — F1 funcional e robustecida: motor + CLI testados (43/43), demo executável e Quickstart no README; guarda anti-corrupção no `replace_context_block` (FIX-001).
+**[0.2.0-alpha]** — 2026-06-10 — F1 polida: 68 testes verdes, ruff/black limpos, multilinguagem provada (C#, C++, Java, JSX, TSX, GDScript), unicidade implícita de localizadores (DEC-011), BOM UTF-8 preservado e UTF-16 rejeitado (FIX-002), `replace_section` fence-aware (FIX-003).
 
 ## ✅ Funcionando
 - **CLI completo** (`python -m src`): `validate`, `apply` (com prévia em dry-run + confirmação) e `rollback <timestamp>`.
@@ -22,7 +22,11 @@
 - **Diff colorido** (unified diff, colorama) na prévia e no resultado.
 - **Demo executável** (`examples/demo_project/` + `examples/demo.yaml`): roda de ponta a ponta (`validate → apply --dry-run → apply → rollback`) sem precisar de um projeto próprio. README traz o Quickstart copiável.
 - `replace_context_block` com guarda contra inclusão das âncoras no `new_content` (evita corrupção silenciosa — FIX-001).
-- 43 testes unitários e de integração, todos verdes.
+- **Unicidade implícita de localizadores** (DEC-011): padrão/âncora ambíguos sem `occurrence` são bloqueados antes de escrever.
+- **Encodings seguros** (FIX-002): UTF-8 com BOM preservado (roundtrip `.cs` do Visual Studio); cp1252 roundtrip; CRLF preservado; UTF-16/32 rejeitados com erro claro.
+- **`replace_section` fence-aware** (FIX-003): headings dentro de ``` não são seções.
+- **Multilinguagem comprovada por teste**: C#, C++, Java, JSX, TSX e GDScript via mecanismo universal (`type: text`).
+- 68 testes unitários e de integração, todos verdes; `ruff` e `black` limpos.
 
 ## 🔧 Em Progresso
 - Nada em progresso — F1 fechada; aguardando início da F2 (GUI).
@@ -31,8 +35,7 @@
 - Nenhum conhecido.
 
 ## 📋 Backlog (curto prazo — itens acionáveis)
-- [ ] Rodar `ruff` + `black` no código (config já em `pyproject.toml`) e corrigir o que apontarem.
-- [ ] Adicionar fixtures de borda em `tests/fixtures/`: arquivo CP-1252, arquivo com CRLF, regex com múltiplas ocorrências, contexto ambíguo.
+- [ ] **Guia de geração para a IA** (`meta/INSTRUCTION_GUIDE.md` ou similar): documento que "ensina" qualquer IA a emitir instruções corretas — regras das âncoras (miolo sem âncoras, `after` distintivo p/ chaves aninhadas), decoradores no `new_content`, `occurrence` só quando intencional, caminhos Windows, encoding UTF-8. **Pré-requisito para usar a ferramenta como beta tester em outros projetos.**
 - [ ] Iniciar F2: `src/gui/main_window.py` (esqueleto da janela + orquestração da pilha existente).
 - [ ] Derivar indicador de confiança por modificação (🟢/🟡/🔴) a partir do dry-run por modificação (já há `ModificationResult.ok/error`).
 
@@ -42,4 +45,4 @@
 - `src/core/backup_manager.py` — base do rollback; o formato do `manifest.txt` é lido pelo `rollback` do CLI.
 
 ## 💬 Última Sessão
-**2026-06-10** — Diagnóstico da fricção de primeiro uso (o erro do console era o placeholder `instrucao.yaml`, não um bug; pytest do usuário deu 42/42). Criada uma **demo executável** (`examples/demo_project/` + `examples/demo.yaml`) cobrindo os 4 tipos + `create_file`, testada de ponta a ponta. Corrigido **FIX-001**: `replace_context_block` produzia corrupção silenciosa quando o `new_content` incluía as âncoras — agora há guarda + teste de regressão (43 testes). README ganhou seção Quickstart e os dois exemplos foram corrigidos. Próximo passo: F2 (GUI) ou polimento de F1.
+**2026-06-10 (parte 2 — polimento F1)** — Caça sistemática a erros silenciosos com 3 achados graves corrigidos: localizadores ambíguos aplicando no lugar errado sem aviso (DEC-011), BOM UTF-8 quebrando localização em `.cs` e UTF-16 virando lixo via cp1252 (FIX-002), e headings dentro de code fences cortando seções markdown (FIX-003). Multilinguagem **provada por teste** em C#, C++, Java, JSX, TSX e GDScript. Semânticas fixadas em teste: decorador removido se não repetido; `after` fecha no 1º match (usar âncora distintiva). 68 testes, ruff/black limpos, versão unificada 0.2.0. Próximo passo: **guia de geração para a IA** (prioridade) e F2.

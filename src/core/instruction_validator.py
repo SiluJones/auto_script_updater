@@ -9,6 +9,7 @@ Fluxo (ver DEC-007):
 
 Ver GLOSSARY.md ("instruction_validator").
 """
+
 from __future__ import annotations
 
 import json

@@ -14,6 +14,7 @@ As 13 estratégias da F1 cobrem três níveis de localização (semântico → c
 * JSON (jmespath): set_json_path, append_json_array, delete_json_path
 * Arquivo inteiro: replace_file, create_file
 """
+
 from __future__ import annotations
 
 from .base_strategy import BaseStrategy, StrategyError

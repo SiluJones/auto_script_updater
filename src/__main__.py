@@ -7,6 +7,7 @@ Uso:
 
 A GUI (F2) reusará exatamente esta mesma pilha (parser → validator → engine).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -14,10 +15,10 @@ import sys
 from pathlib import Path
 
 from .core import diff_renderer  # noqa: F401 (mantém o pacote coeso)
-from .core.patch_engine import ApplyReport, apply_instruction
 from .core.backup_manager import rollback_session
 from .core.instruction_parser import InstructionParseError, load_instruction
 from .core.instruction_validator import InstructionValidationError, validate
+from .core.patch_engine import ApplyReport, apply_instruction
 
 _STATUS_LABEL = {
     "created": "criado",
@@ -34,12 +35,12 @@ def _load_and_validate(instruction_path: str):
         instruction = load_instruction(instruction_path)
     except InstructionParseError as exc:
         print(f"Erro ao ler a instrução: {exc}", file=sys.stderr)
-        raise SystemExit(2)
+        raise SystemExit(2) from exc
     try:
         validate(instruction)
     except InstructionValidationError as exc:
         print(str(exc), file=sys.stderr)
-        raise SystemExit(2)
+        raise SystemExit(2) from exc
     return instruction
 
 
@@ -62,8 +63,10 @@ def _print_report(report: ApplyReport) -> None:
 
     print("\n" + "-" * 60)
     modo = "SIMULAÇÃO (dry-run)" if report.dry_run else "APLICAÇÃO"
-    print(f"{modo}: {criados} criado(s), {modificados} modificado(s), "
-          f"{inalterados} inalterado(s), {falhas} falha(s).")
+    print(
+        f"{modo}: {criados} criado(s), {modificados} modificado(s), "
+        f"{inalterados} inalterado(s), {falhas} falha(s)."
+    )
     if report.rolled_back:
         print("ATENÇÃO: ocorreu falha — todas as escritas foram revertidas (rollback).")
     if report.backup_dir and not report.dry_run:
@@ -85,7 +88,10 @@ def _cmd_apply(args: argparse.Namespace) -> int:
     # Pré-visualização sempre em dry-run, para o usuário conferir antes de confirmar.
     if not args.yes and not args.dry_run:
         preview = apply_instruction(
-            instruction, root_path=args.root, dry_run=True, color=color,
+            instruction,
+            root_path=args.root,
+            dry_run=True,
+            color=color,
         )
         _print_report(preview)
         if not preview.ok:
@@ -138,7 +144,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_app.add_argument("instruction", help="Caminho do arquivo de instrução (YAML/JSON).")
     p_app.add_argument("--root", help="Pasta raiz do projeto (para caminhos relativos).")
     p_app.add_argument("--dry-run", action="store_true", help="Simula sem escrever em disco.")
-    p_app.add_argument("--no-backup", action="store_true", help="Não criar backup (não recomendado).")
+    p_app.add_argument(
+        "--no-backup", action="store_true", help="Não criar backup (não recomendado)."
+    )
     p_app.add_argument("--no-color", action="store_true", help="Saída sem cores ANSI.")
     p_app.add_argument("--yes", "-y", action="store_true", help="Aplica sem pedir confirmação.")
     p_app.set_defaults(func=_cmd_apply)

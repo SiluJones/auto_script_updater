@@ -9,10 +9,12 @@ Localização é responsabilidade de cada estratégia, guiada exclusivamente pel
 campo ``location`` da modificação (a ``strategy`` é a fonte única de como
 interpretá-lo — ver schema/DECISIONS.md).
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 
 class StrategyError(Exception):

@@ -7,10 +7,12 @@ parser semântico — equivalentes em espírito ao *apply_patch* por contexto.
 Convenção de newline: preservamos o conteúdo como veio; o ``patch_engine`` é
 quem decide o estilo de quebra de linha ao gravar em disco.
 """
+
 from __future__ import annotations
 
 import re
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from .base_strategy import BaseStrategy, StrategyError, get_location
 
@@ -35,6 +37,35 @@ def _ensure_trailing_newline(text: str) -> str:
     return text if text.endswith("\n") else text + "\n"
 
 
+def _resolve_occurrence(location: Mapping[str, Any], n_matches: int, descricao: str) -> int:
+    """Resolve qual ocorrência usar, exigindo unicidade quando ela é implícita.
+
+    Regra (Armadilha #5 / DEC-011): se ``location.occurrence`` NÃO foi
+    especificado, o localizador precisa ser único — casar mais de uma vez é
+    ambiguidade e vira erro (antes, aplicava na primeira silenciosamente, o que
+    podia modificar o lugar errado). Se ``occurrence`` foi especificado, a
+    escolha é posicional e explícita: validamos apenas o intervalo.
+
+    Returns:
+        Índice 1-based da ocorrência a usar.
+    """
+    explicit = "occurrence" in location
+    occurrence = int(location.get("occurrence", 1))
+    if occurrence < 1:
+        raise StrategyError(f"location.occurrence deve ser >= 1 (recebido: {occurrence}).")
+    if n_matches == 0 or occurrence > n_matches:
+        raise StrategyError(
+            f"{descricao} casou {n_matches} vez(es); a instrução pediu a ocorrência {occurrence}."
+        )
+    if not explicit and n_matches > 1:
+        raise StrategyError(
+            f"{descricao} casou {n_matches} vezes e 'location.occurrence' não foi "
+            "especificado — localização ambígua. Especifique occurrence (1.."
+            f"{n_matches}) para escolher qual, ou torne o localizador mais específico."
+        )
+    return occurrence
+
+
 class _InsertPattern(BaseStrategy):
     """Insere ``content`` antes/depois da N-ésima linha que casa o regex."""
 
@@ -43,16 +74,11 @@ class _InsertPattern(BaseStrategy):
     def apply(self, source: str, modification: Mapping[str, Any]) -> str:
         location = get_location(modification)
         regex = _compile(location["pattern"])
-        occurrence = int(location.get("occurrence", 1))
         content = modification.get("content", "")
 
         lines = _split_lines(source)
         matches = _matching_line_indices(lines, regex)
-        if len(matches) < occurrence:
-            raise StrategyError(
-                f"Padrão {location['pattern']!r} casou {len(matches)} vez(es); "
-                f"a instrução pediu a ocorrência {occurrence}."
-            )
+        occurrence = _resolve_occurrence(location, len(matches), f"Padrão {location['pattern']!r}")
         target = matches[occurrence - 1]
         block = _ensure_trailing_newline(content)
 
@@ -84,16 +110,11 @@ class ReplaceLinePattern(BaseStrategy):
     def apply(self, source: str, modification: Mapping[str, Any]) -> str:
         location = get_location(modification)
         regex = _compile(location["pattern"])
-        occurrence = int(location.get("occurrence", 1))
         new_content = modification.get("new_content", "")
 
         lines = _split_lines(source)
         matches = _matching_line_indices(lines, regex)
-        if len(matches) < occurrence:
-            raise StrategyError(
-                f"Padrão {location['pattern']!r} casou {len(matches)} vez(es); "
-                f"a instrução pediu a ocorrência {occurrence}."
-            )
+        occurrence = _resolve_occurrence(location, len(matches), f"Padrão {location['pattern']!r}")
         target = matches[occurrence - 1]
         # Preserva o terminador de linha original (\n, \r\n ou ausente no fim do arquivo).
         original = lines[target]
@@ -113,9 +134,20 @@ class ReplaceContextBlock(BaseStrategy):
     bloco e **permanecem** no arquivo; tudo entre eles é trocado por
     ``new_content``. Como o mesmo modelo que gera o código escolhe as âncoras,
     é trivial torná-las únicas (ver DECISIONS.md).
+
+    Semântica do ``after`` (importante): é a PRIMEIRA ocorrência de ``after``
+    DEPOIS de ``before``. Para código com delimitadores repetidos (ex.: ``}``
+    em C/JS/Java com blocos aninhados), um ``after`` curto fecha no delimitador
+    interno — use uma âncora distintiva (a linha completa de fechamento no
+    nível certo, p.ex. ``"\\n}"`` no início de linha, ou um trecho do código
+    que vem depois do bloco).
     """
 
     name = "replace_context_block"
+
+    @staticmethod
+    def _count(haystack: str, needle: str) -> int:
+        return haystack.count(needle)
 
     @staticmethod
     def _nth_index(haystack: str, needle: str, n: int) -> int:
@@ -130,27 +162,27 @@ class ReplaceContextBlock(BaseStrategy):
         location = get_location(modification)
         before = location["before"]
         after = location["after"]
-        occurrence = int(location.get("occurrence", 1))
         new_content = modification.get("new_content", "")
 
+        occurrence = _resolve_occurrence(
+            location, self._count(source, before), f"Âncora 'before' {before!r}"
+        )
         start = self._nth_index(source, before, occurrence)
-        if start == -1:
-            raise StrategyError(
-                f"Âncora 'before' não encontrada (ocorrência {occurrence}): {before!r}."
-            )
         inner_start = start + len(before)
         after_pos = source.find(after, inner_start)
         if after_pos == -1:
-            raise StrategyError(
-                f"Âncora 'after' não encontrada depois de 'before': {after!r}."
-            )
+            raise StrategyError(f"Âncora 'after' não encontrada depois de 'before': {after!r}.")
         # Guarda contra o erro mais comum: incluir as próprias âncoras no
         # new_content. Como 'before'/'after' PERMANECEM no arquivo, repeti-las
         # no miolo as duplicaria — uma corrupção que, sem esta checagem, passaria
         # silenciosamente (o apply "funcionaria"). Detectamos a assinatura
         # inequívoca: primeira linha == 'before' E última == 'after'.
         nc_lines = new_content.strip("\n").splitlines()
-        if nc_lines and nc_lines[0].strip() == before.strip() and nc_lines[-1].strip() == after.strip():
+        if (
+            nc_lines
+            and nc_lines[0].strip() == before.strip()
+            and nc_lines[-1].strip() == after.strip()
+        ):
             raise StrategyError(
                 "replace_context_block: o new_content inclui as âncoras 'before' e "
                 "'after', que permanecem no arquivo e seriam duplicadas. Forneça "
@@ -168,10 +200,28 @@ class ReplaceSection(BaseStrategy):
     A seção vai do heading até (exclusive) o próximo heading de nível igual ou
     superior (mesmo nº de ``#`` ou menos), ou o fim do arquivo.
     ``include_heading`` controla se o próprio heading é substituído.
+
+    Linhas dentro de *code fences* (blocos ``` ou ~~~) são ignoradas tanto na
+    busca do heading quanto na detecção do fim da seção — um ``## Exemplo``
+    dentro de um bloco de código não é um heading (FIX-003).
     """
 
     name = "replace_section"
     _HEADING_RE = re.compile(r"^(#{1,6})\s")
+    _FENCE_RE = re.compile(r"^\s{0,3}(```|~~~)")
+
+    @classmethod
+    def _heading_indices(cls, lines: list[str], heading: str) -> list[int]:
+        """Índices das linhas que são o heading procurado, fora de code fences."""
+        found: list[int] = []
+        in_fence = False
+        for i, ln in enumerate(lines):
+            if cls._FENCE_RE.match(ln):
+                in_fence = not in_fence
+                continue
+            if not in_fence and ln.strip() == heading:
+                found.append(i)
+        return found
 
     def apply(self, source: str, modification: Mapping[str, Any]) -> str:
         location = get_location(modification)
@@ -181,24 +231,40 @@ class ReplaceSection(BaseStrategy):
 
         level = len(heading) - len(heading.lstrip("#"))
         if level == 0:
-            raise StrategyError(
-                f"location.heading deve começar com '#': {heading!r}."
-            )
+            raise StrategyError(f"location.heading deve começar com '#': {heading!r}.")
 
         lines = source.split("\n")
-        start = next(
-            (i for i, ln in enumerate(lines) if ln.strip() == heading), None
-        )
-        if start is None:
-            existentes = [ln for ln in lines if self._HEADING_RE.match(ln)]
+        candidatos = self._heading_indices(lines, heading)
+        if not candidatos:
+            existentes = []
+            in_fence = False
+            for ln in lines:
+                if self._FENCE_RE.match(ln):
+                    in_fence = not in_fence
+                    continue
+                if not in_fence and self._HEADING_RE.match(ln):
+                    existentes.append(ln)
             dica = ""
             if existentes:
                 amostra = ", ".join(repr(h) for h in existentes[:8])
                 dica = f" Headings encontrados: {amostra}."
             raise StrategyError(f"Heading {heading!r} não encontrado.{dica}")
+        if len(candidatos) > 1:
+            raise StrategyError(
+                f"Heading {heading!r} aparece {len(candidatos)} vezes no documento — "
+                "localização ambígua. Torne os headings únicos (ou ajuste o documento) "
+                "antes de usar replace_section."
+            )
+        start = candidatos[0]
 
         end = len(lines)
+        in_fence = False
         for j in range(start + 1, len(lines)):
+            if self._FENCE_RE.match(lines[j]):
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                continue
             m = self._HEADING_RE.match(lines[j])
             if m and len(m.group(1)) <= level:
                 end = j

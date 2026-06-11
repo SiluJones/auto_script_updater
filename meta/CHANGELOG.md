@@ -5,7 +5,26 @@
 
 ## [Não lançado]
 ### Adicionado
-- *(nada ainda — próximo ciclo é a F2/GUI)*
+- *(nada ainda — próximo ciclo: guia de geração para a IA + F2/GUI)*
+
+---
+
+## [0.2.0] — 2026-06-10
+### Modificado (comportamento)
+- **DEC-011 — unicidade implícita de localizadores:** com `occurrence` ausente, padrões/âncoras que casam mais de uma vez agora são **rejeitados como ambíguos** antes de qualquer escrita (antes aplicavam na 1ª ocorrência silenciosamente). `occurrence` explícito segue sendo escolha posicional. Vale para `insert_after_pattern`, `insert_before_pattern`, `replace_line_pattern` e a âncora `before` do `replace_context_block`; `replace_section` rejeita heading duplicado.
+
+### Corrigido
+- **FIX-002 — encodings:** BOM UTF-8 detectado e **preservado** (roundtrip com `utf-8-sig`; arquivos `.cs` do Visual Studio agora localizam padrões na 1ª linha). UTF-16/32 rejeitados com erro claro (antes, cp1252 os "decodificava" como lixo, e `replace_file` converteria o encoding silenciosamente). Detecção de newline movida para o texto decodificado. Erros de leitura/decodificação agora entram no fluxo normal de falha por arquivo (status `failed` + stop/rollback) em vez de derrubar o processo.
+- **FIX-003 — `replace_section` fence-aware:** headings dentro de blocos ``` / ~~~ deixam de ser tratados como seções (não são mais encontrados nem encerram a seção real no lugar errado).
+
+### Adicionado
+- **Suíte multilinguagem** (`tests/test_multilang.py`): prova do mecanismo universal em **C#, C++, Java, JSX, TSX e GDScript**, incluindo engine completo com C# + BOM e rejeição de UTF-16.
+- **Suíte de bordas** (`tests/test_edge_cases.py`): unicidade implícita/explícita, fences, heading duplicado, última seção até EOF, chaves aninhadas no context block (semântica fixada), decorador removido se não repetido (semântica fixada), cp1252 roundtrip, CRLF preservado, arquivo sem newline final.
+- Total de testes: 43 → **68**.
+
+### Qualidade
+- `ruff check` limpo (auto-fix + correções manuais de B904) e `black` aplicado em todo o código.
+- Versão unificada em `0.2.0` (`src/__init__.py` e `pyproject.toml` estavam dessincronizados em 0.0.1).
 
 ---
 

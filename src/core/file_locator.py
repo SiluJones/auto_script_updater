@@ -5,10 +5,12 @@ Combina ``root_path`` + ``relative_path`` ou usa ``absolute_path`` diretamente
 contenção: o caminho resolvido não pode escapar da pasta raiz (uma instrução de
 IA não deve gravar fora do projeto sem o usuário ter escolhido o modo absoluto).
 """
+
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 
 class FileLocatorError(Exception):
@@ -63,9 +65,7 @@ def resolve_path(file_entry: Mapping[str, Any], root_path: str | Path | None) ->
             )
         return Path(absolute)
 
-    raise FileLocatorError(
-        f"Arquivo '{file_entry.get('id')}': path_mode inválido: {path_mode!r}."
-    )
+    raise FileLocatorError(f"Arquivo '{file_entry.get('id')}': path_mode inválido: {path_mode!r}.")
 
 
 def ensure_ready(path: Path, file_entry: Mapping[str, Any]) -> None:

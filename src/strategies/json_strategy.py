@@ -8,11 +8,13 @@ lista — ``a.b.c`` e ``a.b[0].c`` — que cobrem o uso documentado.
 O arquivo é parseado como JSON, mutado em memória e reserializado com
 ``indent=2`` e ``ensure_ascii=False`` (preserva acentuação) + newline final.
 """
+
 from __future__ import annotations
 
 import json
 import re
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from .base_strategy import BaseStrategy, StrategyError, get_location
 

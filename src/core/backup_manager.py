@@ -10,6 +10,7 @@ Antes de QUALQUER escrita, cada arquivo a ser tocado é registrado:
 cópia e remove os que foram criados. Isso dá atomicidade à instrução — em falha
 com ``stop_on_error``, o projeto volta exatamente ao estado anterior.
 """
+
 from __future__ import annotations
 
 import shutil
@@ -108,14 +109,14 @@ def rollback_session(backup_root: Path, timestamp: str) -> list[str]:
     revertidos: list[str] = []
     for line in manifest.read_text(encoding="utf-8").splitlines():
         if line.startswith("[modificado] "):
-            original = Path(line[len("[modificado] "):])
+            original = Path(line[len("[modificado] ") :])
             mirror = mirror_path(session_dir, original)
             if mirror.exists():
                 original.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(mirror, original)
                 revertidos.append(f"restaurado: {original}")
         elif line.startswith("[criado] "):
-            original = Path(line[len("[criado] "):])
+            original = Path(line[len("[criado] ") :])
             if original.exists():
                 original.unlink()
                 revertidos.append(f"removido: {original}")
