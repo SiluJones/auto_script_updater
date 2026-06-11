@@ -9,6 +9,20 @@
 
 ---
 
+## [0.1.1] — 2026-06-10
+### Adicionado
+- **Demo executável** (`examples/demo_project/` + `examples/demo.yaml`) — projeto-alvo real com arquivos `.py`, `.md`, `.json` e `.js` e uma instrução que aplica de verdade (cobre os 4 tipos + `create_file`). Permite testar `validate → apply --dry-run → apply → rollback` de ponta a ponta sem ter um projeto próprio.
+- README com seção **Quickstart** (comandos copiáveis usando a demo) e seção "Uso no seu projeto" com placeholder explícito.
+
+### Corrigido
+- **FIX-001:** `replace_context_block` agora rejeita com erro claro quando o `new_content` inclui as próprias âncoras `before`/`after` (antes, isso duplicava as âncoras silenciosamente, corrompendo o arquivo sem sinalizar). Acrescentado teste de regressão.
+- `examples/exemplo_instrucao.yaml` — corrigido o bloco JavaScript que continha as âncoras no `new_content` (agora só o miolo entre elas).
+
+### Documentação
+- README deixou de usar o nome genérico `instrucao.yaml` nos comandos (causava confusão de "arquivo não encontrado" no primeiro uso).
+
+---
+
 ## [0.1.0] — 2026-06-08
 ### Adicionado
 - **Motor de execução (F1) funcional via CLI** — fluxo completo instrução → validação → localização → aplicação → backup → diff → resultado, com rollback.

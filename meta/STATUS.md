@@ -6,7 +6,7 @@
 ---
 
 ## Versão Atual
-**[0.1.0-alpha]** — 2026-06-08 — F1 concluída: motor de execução + CLI funcionais e testados (42/42 testes verdes).
+**[0.1.1-alpha]** — 2026-06-10 — F1 funcional e robustecida: motor + CLI testados (43/43), demo executável e Quickstart no README; guarda anti-corrupção no `replace_context_block` (FIX-001).
 
 ## ✅ Funcionando
 - **CLI completo** (`python -m src`): `validate`, `apply` (com prévia em dry-run + confirmação) e `rollback <timestamp>`.
@@ -20,7 +20,9 @@
 - **Resolução de caminhos** relative/absolute com guarda de contenção (relativo não escapa da raiz).
 - **Backup obrigatório** timestampado (DEC-006) + **rollback atômico** automático em falha e rollback manual por timestamp.
 - **Diff colorido** (unified diff, colorama) na prévia e no resultado.
-- 42 testes unitários e de integração, todos verdes.
+- **Demo executável** (`examples/demo_project/` + `examples/demo.yaml`): roda de ponta a ponta (`validate → apply --dry-run → apply → rollback`) sem precisar de um projeto próprio. README traz o Quickstart copiável.
+- `replace_context_block` com guarda contra inclusão das âncoras no `new_content` (evita corrupção silenciosa — FIX-001).
+- 43 testes unitários e de integração, todos verdes.
 
 ## 🔧 Em Progresso
 - Nada em progresso — F1 fechada; aguardando início da F2 (GUI).
@@ -40,4 +42,4 @@
 - `src/core/backup_manager.py` — base do rollback; o formato do `manifest.txt` é lido pelo `rollback` do CLI.
 
 ## 💬 Última Sessão
-**2026-06-08** — Implementada a F1 inteira: schema + parser + validator, as 13 estratégias (Python/libcst, texto/contexto universal, markdown, JSON/jmespath, arquivo inteiro), file_locator com guarda de contenção, backup_manager com rollback atômico e por timestamp, diff_renderer colorido, patch_engine (transação + dry-run + precedência de settings) e CLI (`validate`/`apply`/`rollback`). 42 testes verdes + smoke test ponta a ponta. Três decisões novas (DEC-008/009/010) e alinhamento dos nomes de módulo ao contrato F0. Próximo passo: F2 (GUI PySide6) reusando a mesma pilha.
+**2026-06-10** — Diagnóstico da fricção de primeiro uso (o erro do console era o placeholder `instrucao.yaml`, não um bug; pytest do usuário deu 42/42). Criada uma **demo executável** (`examples/demo_project/` + `examples/demo.yaml`) cobrindo os 4 tipos + `create_file`, testada de ponta a ponta. Corrigido **FIX-001**: `replace_context_block` produzia corrupção silenciosa quando o `new_content` incluía as âncoras — agora há guarda + teste de regressão (43 testes). README ganhou seção Quickstart e os dois exemplos foram corrigidos. Próximo passo: F2 (GUI) ou polimento de F1.

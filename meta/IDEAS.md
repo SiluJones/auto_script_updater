@@ -68,6 +68,15 @@ Modo opcional onde o usuário insere comentários especiais no código (`# ASU_A
 ### 2026-06-08 — Localização semântica multilinguagem via tree-sitter (F4)
 Hoje a precisão semântica existe só para Python (libcst) e JSON (jmespath); demais linguagens usam janela de contexto/regex. tree-sitter tem gramáticas para dezenas de linguagens e permitiria estratégias semânticas (`replace_function`/`replace_class`) em JS, Go, Rust, etc. Encaixa como reforço opcional sobre o mecanismo universal de contexto. Registrado a partir da DEC-010. Prioridade F4.
 
+### 2026-06-10 — Canal de "aviso" (warning) no engine, além de ok/erro
+Hoje cada modificação resulta em ok ou erro. Um terceiro nível de *aviso* permitiria sinalizar situações suspeitas que não justificam bloquear (ex.: regex casou num único lugar plausível mas frágil, contexto quase ambíguo, indentação inesperada). Casaria diretamente com o indicador de confiança 🟡 da GUI (F2) e tornaria o dry-run mais informativo. Surgiu ao implementar a guarda do FIX-001.
+
+### 2026-06-10 — Flag opcional `include_anchors` no `replace_context_block`
+Por padrão (convenção A, FIX-001) as âncoras `before`/`after` permanecem e o `new_content` é só o miolo. Uma flag opt-in `include_anchors: true` permitiria a convenção B (substituir o bloco INTEIRO, âncoras inclusas) para quem achar mais natural reescrever a função/bloco completo. Manter o default em A; só adicionar se o uso real pedir.
+
+### 2026-06-10 — Modo `--self-test` (rodar a demo embutida)
+Um comando que aplica a `examples/demo.yaml` num diretório temporário e reverte, confirmando que a instalação está sã (estratégias, backup, rollback) num único passo. Bom como verificação pós-instalação e como ensino vivo do fluxo.
+
 ---
 
 ## ✅ Concluídas

@@ -100,18 +100,16 @@ files:
     language: "javascript"
     modifications:
       - id: "m1"
-        description: "Substitui o corpo de initApp usando janela de contexto"
+        description: "Substitui o corpo de initApp usando janela de contexto (só o miolo entre as âncoras)"
         strategy: "replace_context_block"
         location:
           before: "function initApp() {"
           after: "}"
           occurrence: 1
-        new_content: |
-          function initApp() {
+        new_content: |2
             console.log("App iniciado");
             setupRoutes();
             return true;
-          }
 
   # ── Criação de arquivo novo: unifica "entregar código completo" + patch ────
   - id: "f5"

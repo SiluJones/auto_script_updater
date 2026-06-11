@@ -144,6 +144,19 @@ class ReplaceContextBlock(BaseStrategy):
             raise StrategyError(
                 f"Âncora 'after' não encontrada depois de 'before': {after!r}."
             )
+        # Guarda contra o erro mais comum: incluir as próprias âncoras no
+        # new_content. Como 'before'/'after' PERMANECEM no arquivo, repeti-las
+        # no miolo as duplicaria — uma corrupção que, sem esta checagem, passaria
+        # silenciosamente (o apply "funcionaria"). Detectamos a assinatura
+        # inequívoca: primeira linha == 'before' E última == 'after'.
+        nc_lines = new_content.strip("\n").splitlines()
+        if nc_lines and nc_lines[0].strip() == before.strip() and nc_lines[-1].strip() == after.strip():
+            raise StrategyError(
+                "replace_context_block: o new_content inclui as âncoras 'before' e "
+                "'after', que permanecem no arquivo e seriam duplicadas. Forneça "
+                "apenas o conteúdo ENTRE as âncoras (o miolo), sem repetir "
+                f"{before!r} nem {after!r}."
+            )
         # Reconstrói com o novo bloco em suas próprias linhas, entre as âncoras intactas.
         replacement = "\n" + new_content.strip("\n") + "\n"
         return source[:inner_start] + replacement + source[after_pos:]

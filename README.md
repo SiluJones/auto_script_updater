@@ -38,30 +38,45 @@ Para desenvolvimento (testes + GUI futura + qualidade):
 pip install -r requirements-dev.txt
 ```
 
-## Uso
+## Quickstart — primeiro teste (copie e cole)
 
-Validar uma instrução sem aplicar nada:
-
-```
-python -m src validate instrucao.yaml
-```
-
-Aplicar (mostra prévia em dry-run e pede confirmação antes de escrever):
+O repositório traz uma **demo executável** em `examples/demo_project/` (arquivos
+reais) com a instrução `examples/demo.yaml`. Rode na raiz do projeto, com o
+ambiente já ativado:
 
 ```
-python -m src apply instrucao.yaml --root C:\meu_projeto
+python -m src validate examples\demo.yaml
+python -m src apply examples\demo.yaml --root examples\demo_project --dry-run
+python -m src apply examples\demo.yaml --root examples\demo_project
+python -m src rollback <TIMESTAMP> --root examples\demo_project
 ```
 
-Simular sem escrever / aplicar sem perguntar / desfazer:
+- O 1º comando valida a instrução.
+- O 2º (`--dry-run`) mostra o diff colorido **sem escrever nada** — é o teste seguro e repetível.
+- O 3º aplica de verdade (cria backup e pede confirmação); ao final imprime o `Backup: ...\<TIMESTAMP>`.
+- O 4º desfaz tudo: copie o `<TIMESTAMP>` impresso pelo passo anterior (ex.: `20260610_041628`).
+
+Depois de testar, a demo volta ao estado original (via rollback acima ou
+`git checkout examples\demo_project`), então você pode repetir à vontade.
+
+> Nota: `examples\exemplo_instrucao.yaml` é apenas **ilustrativo** — aponta para
+> caminhos fictícios (`src/auth/login.py`, `C:\projetos\...`) e **não roda** como
+> está. Para testar de fato, use `examples\demo.yaml` acima.
+
+## Uso no seu projeto
+
+Substitua `MINHA_INSTRUCAO.yaml` pelo caminho real da instrução que a IA gerou e
+`C:\meu_projeto` pela raiz do seu projeto:
 
 ```
-python -m src apply instrucao.yaml --root C:\meu_projeto --dry-run
-python -m src apply instrucao.yaml --root C:\meu_projeto --yes
-python -m src rollback 20260607_231500 --root C:\meu_projeto
+python -m src validate MINHA_INSTRUCAO.yaml
+python -m src apply MINHA_INSTRUCAO.yaml --root C:\meu_projeto --dry-run
+python -m src apply MINHA_INSTRUCAO.yaml --root C:\meu_projeto
+python -m src rollback <TIMESTAMP> --root C:\meu_projeto
 ```
 
-Um exemplo completo de arquivo de instrução está em
-`examples/exemplo_instrucao.yaml`.
+Flags úteis: `--dry-run` (simula sem escrever), `--yes` (aplica sem perguntar),
+`--no-color` (saída sem cores), `--no-backup` (não recomendado).
 
 ## Testes
 

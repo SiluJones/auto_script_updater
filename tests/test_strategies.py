@@ -120,6 +120,16 @@ def test_context_block_after_anchor_missing():
               new_content="y")
 
 
+def test_context_block_rejects_anchors_in_new_content():
+    # Erro comum: incluir as próprias âncoras no new_content duplicaria 'before'/'after'.
+    # A guarda deve transformar essa corrupção silenciosa em erro claro.
+    src = "function initApp() {\n  velho();\n}\n"
+    with pytest.raises(StrategyError, match="âncoras|ancoras|miolo"):
+        apply("replace_context_block", src,
+              location={"before": "function initApp() {", "after": "}"},
+              new_content="function initApp() {\n  novo();\n}")
+
+
 # ───────────────────────── Markdown ─────────────────────────
 
 MD = "# T\n\n## A\n\naaa\n\n## B\n\nbbb\n\n### B1\n\nb1\n\n## C\n\nccc\n"

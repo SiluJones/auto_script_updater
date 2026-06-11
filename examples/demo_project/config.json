@@ -1,0 +1,11 @@
+{
+  "app": {
+    "name": "demo",
+    "version": "2.0.0"
+  },
+  "features": [
+    "login",
+    "logging"
+  ],
+  "legacy": {}
+}

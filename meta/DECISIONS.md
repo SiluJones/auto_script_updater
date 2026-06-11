@@ -227,3 +227,25 @@ Pergunta de produto: a ferramenta pode ser "independente do tipo de arquivo ou l
 - A ferramenta aceita qualquer linguagem via contexto já na F1; o ponto forte do fluxo é que o mesmo modelo escreve o código e a instrução, então escolhe âncoras de contexto únicas com conhecimento perfeito.
 - Instalação mínima (`requirements.txt`) basta para CLI e testes; a GUI é um opt-in (`requirements-gui.txt`).
 - Abre caminho limpo para a extensão VS Code / core-as-library da F4.
+
+---
+
+## FIX-001 — Corrupção silenciosa no `replace_context_block` (âncoras duplicadas)
+**Data:** 2026-06-10 · **Status:** corrigido
+
+### Sintoma
+Ao aplicar uma instrução com `replace_context_block` cujo `new_content` incluía as próprias âncoras `before`/`after`, o arquivo resultante ficava com as âncoras **duplicadas** (ex.: dois `function initApp() {` e duas `}`). O mais grave: o `apply` concluía **sem erro** — uma corrupção silenciosa. Detectado pelo `apply --dry-run` da nova demo, antes de qualquer escrita.
+
+### Causa raiz
+Por design (convenção alinhada ao *apply_patch*), em `replace_context_block` as âncoras `before` e `after` são **contexto** e permanecem no arquivo; apenas o conteúdo ENTRE elas (o miolo) é trocado pelo `new_content`. Quando o autor da instrução repete as âncoras dentro do `new_content`, elas são reinseridas — duplicando. A implementação estava correta para sua semântica, mas nada impedia esse erro de uso, e o resultado inválido passava despercebido. Os dois exemplos do repositório (`exemplo_instrucao.yaml` e a demo inicial) cometiam exatamente esse erro.
+
+### Correção
+1. **Guarda no código** (`text_strategy.py`): antes de aplicar, detecta a assinatura inequívoca do erro — primeira linha do `new_content` == `before` **e** última linha == `after` — e lança `StrategyError` com mensagem didática (explica que as âncoras permanecem e que o `new_content` deve conter só o miolo). Falso positivo é improvável (exigiria duplicar a âncora de propósito).
+2. **Teste de regressão** em `tests/test_strategies.py` (`test_context_block_rejects_anchors_in_new_content`).
+3. **Exemplos corrigidos:** `exemplo_instrucao.yaml` e `examples/demo.yaml` passam a usar `new_content` só com o miolo (e `|2` no YAML para preservar a indentação).
+
+### Decisão de design embutida
+Manteve-se a convenção A (âncoras preservadas, `new_content` = miolo) em vez de trocar a semântica para "substituir o bloco inteiro incluindo as âncoras". Motivos: alinhamento com o *apply_patch*, coerência com o nome ("context block"), e o fato de que a guarda transforma o erro silencioso em erro alto sem mudar o contrato já documentado. Uma flag opcional `include_anchors` foi registrada como ideia (IDEAS) caso o uso real peça o outro comportamento.
+
+### Lição
+Numa ferramenta de patch, **falhar alto é obrigatório**: um resultado errado que não levanta erro é pior que uma exceção. Estratégias devem bloquear quando o resultado provável é inválido.
