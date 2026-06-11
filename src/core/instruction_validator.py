@@ -72,6 +72,39 @@ def validate(instruction: dict[str, Any]) -> None:
     if errors:
         raise InstructionValidationError([_format_error(e) for e in errors])
 
+    # Passo 3 — unicidade de IDs (FIX-006): o JSON Schema não expressa isso.
+    # IDs repetidos não corrompem a aplicação, mas tornam o relatório/diff
+    # ambíguo e quebram qualquer referência futura por id (GUI, histórico).
+    id_errors = _check_unique_ids(instruction)
+    if id_errors:
+        raise InstructionValidationError(id_errors)
+
+
+def _check_unique_ids(instruction: dict[str, Any]) -> list[str]:
+    """Acusa ids duplicados em ``files[]`` e em ``modifications[]`` de cada arquivo."""
+    erros: list[str] = []
+    vistos_files: dict[str, int] = {}
+    for idx, file_entry in enumerate(instruction.get("files", [])):
+        fid = file_entry.get("id")
+        if fid in vistos_files:
+            erros.append(
+                f'files[{idx}].id: "{fid}" repetido (já usado em files[{vistos_files[fid]}]). '
+                "Cada arquivo precisa de um id único."
+            )
+        else:
+            vistos_files[fid] = idx
+        vistos_mods: dict[str, int] = {}
+        for midx, mod in enumerate(file_entry.get("modifications", [])):
+            mid = mod.get("id")
+            if mid in vistos_mods:
+                erros.append(
+                    f'files[{idx}].modifications[{midx}].id: "{mid}" repetido dentro do '
+                    f'arquivo "{fid}" (já usado em modifications[{vistos_mods[mid]}]).'
+                )
+            else:
+                vistos_mods[mid] = midx
+    return erros
+
 
 def _check_format_version(instruction: dict[str, Any]) -> list[str]:
     """Confere presença e compatibilidade de ``format_version``."""

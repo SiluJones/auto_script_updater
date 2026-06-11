@@ -11,7 +11,7 @@ As 13 estratégias da F1 cobrem três níveis de localização (semântico → c
 * Texto universal (re): insert_after_pattern, insert_before_pattern,
   replace_line_pattern, replace_context_block
 * Markdown: replace_section
-* JSON (jmespath): set_json_path, append_json_array, delete_json_path
+* JSON (navegador de caminho próprio): set_json_path, append_json_array, delete_json_path
 * Arquivo inteiro: replace_file, create_file
 """
 

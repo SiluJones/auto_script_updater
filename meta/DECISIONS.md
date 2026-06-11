@@ -306,3 +306,74 @@ Rastreio de estado `in_fence` (linhas iniciando com ``` ou ~~~, até 3 espaços 
 
 ### Lição
 Markdown "de verdade" carrega código dentro; qualquer parser de estrutura markdown precisa ser fence-aware desde o primeiro dia.
+
+---
+
+## DEC-012 — Kit de ensino para a IA geradora como artefato do produto (docs/)
+**Data:** 2026-06-10 · **Status:** aceita
+
+### Contexto
+O consumidor real da ferramenta é a IA que gera as instruções. Sem um material que codifique as regras do formato (e as armadilhas descobertas em FIX-001/DEC-011/FIX-002…), cada novo projeto repetiria os mesmos erros de geração — inaceitável para usar a ferramenta como "beta tester" em vários projetos.
+
+### Decisão
+Criar e versionar **junto do código** (pasta `docs/`) dois artefatos autocontidos:
+- `docs/INSTRUCTION_GUIDE.md` — referência completa: esqueleto, tabela das 13 estratégias, as cinco regras de ouro (miolo sem âncoras; `after` distintivo; ambiguidade sem `occurrence` rejeitada; decoradores no `new_content`; caminhos JSON conferidos), detalhes de YAML/encoding/Windows e checklist de autovalidação.
+- `docs/PROMPT_IA.md` — bloco curto pronto para colar nas instruções de qualquer projeto (Claude Project / system prompt), apontando para o guia.
+Fluxo de adoção por projeto: copiar o guia para a base de conhecimento + colar o bloco. O guia evolui NO repo da ferramenta (uma fonte de verdade) e os projetos consumidores recebem a versão nova quando atualizarem a cópia.
+
+### Alternativas consideradas
+- **Guia dentro do README** — misturaria público (usuário humano × IA geradora) e dificultaria copiar só o necessário → descartado.
+- **Prompt gigante único** — um bloco enorme polui o contexto dos projetos; separar referência (sob demanda) de diretiva (sempre presente) é mais econômico → adotado o par guia+bloco.
+
+### Consequências
+- Validado por *dogfooding* nesta sessão: instrução escrita seguindo apenas o guia aplicou C# (BOM preservado, `after` no nível certo com aninhamento), Python decorado e TSX, com rollback íntegro.
+- Toda regra nova (futuros FIX/DEC que afetem geração) deve ser refletida no guia na mesma sessão.
+
+---
+
+## FIX-004 — JSON era reformatado por inteiro (estilo do original destruído)
+**Data:** 2026-06-10 · **Status:** corrigido
+
+### Sintoma
+Qualquer modificação JSON reserializava o arquivo com `indent=2` fixo. Um `config.json` com indent=4, tabs ou compacto (uma linha) saía **inteiramente reformatado**: diff explosivo (impossível revisar a mudança real), estilo do projeto destruído e newline final adicionado onde não existia. Silencioso — "funcionava".
+
+### Correção
+`_detect_style()` infere do original: indentação (nº de espaços ou tab) pela primeira linha indentada; formato compacto quando não há linha indentada; presença/ausência do newline final. `_dump_json(data, source)` reserializa fielmente. Fonte vazia (arquivo novo) usa o padrão indent=2 + newline. Testes: indent=4, tab, compacto sem `\n` final e vazio.
+
+### Lição
+Ferramenta de patch deve tocar **só o que mudou** — também na serialização. Roundtrip fiel é requisito, não cosmética.
+
+---
+
+## FIX-005 — `null` tratado como "não existe" no JSON (delete impossível) + jmespath removido do núcleo
+**Data:** 2026-06-10 · **Status:** corrigido
+
+### Sintoma
+`delete_json_path` sobre `{"a": null}` falhava com "Caminho 'a' não existe" — era **impossível remover** uma chave de valor `null`. `append_json_array` sobre lista `null` dava a mesma mensagem enganosa.
+
+### Causa raiz
+A checagem de existência usava `jmespath.search()`, que retorna `None` tanto para caminho ausente quanto para valor `null` — indistinguíveis.
+
+### Correção
+Navegador próprio `_walk(data, tokens)` com sentinela `_MISSING`: ausência ≠ `null`. `delete` remove `null` normalmente; `append` distingue "não existe" de "existe mas vale null" (mensagem orienta usar `set_json_path` primeiro). Como o navegador próprio já cobria 100% do subset de caminhos (`a.b[0].c`), o **jmespath saiu do núcleo** (`requirements.txt` agora: PyYAML, jsonschema, libcst, colorama) — menos uma dependência, alinhado à meta de core como lib pura (F4). Menções em schema/docstrings atualizadas para "caminho pontilhado".
+
+### Lição
+Bibliotecas de consulta que sinalizam ausência com `None` são armadilha em JSON, onde `null` é valor legítimo. Sentinela própria resolve.
+
+---
+
+## FIX-006 — Intake endurecido: YAML duplicado, IDs repetidos e arquivo binário
+**Data:** 2026-06-10 · **Status:** corrigido
+
+### Sintomas (três silêncios da camada de entrada)
+1. **Chave YAML duplicada**: `yaml.safe_load` aceita `files:` definido duas vezes — a primeira **evapora** sem aviso. Numa instrução gerada por IA, metade das mudanças sumiria.
+2. **IDs repetidos** (`files[].id` entre arquivos; `modifications[].id` dentro do arquivo): o schema não expressa unicidade; relatórios/diffs ficavam ambíguos e qualquer referência futura por id (GUI, histórico) quebraria.
+3. **Arquivo-alvo binário**: cp1252 "decodifica" quase qualquer byte; um `.png`/`.exe` apontado por engano virava "texto", e um `replace_file` o **sobrescreveria** silenciosamente.
+
+### Correção
+1. `_StrictLoader` (SafeLoader estendido) rejeita chave duplicada com linha/coluna do YAML.
+2. Passo 3 do validator (`_check_unique_ids`) acusa cada duplicata com o índice das duas ocorrências.
+3. Guarda no `_read_target`: byte NUL ⇒ erro "parece binário (ou UTF-16 sem BOM)" — pega também UTF-16 sem BOM, complementando o FIX-002.
+
+### Lição
+Camada de entrada permissiva é dívida: cada tolerância do parser/validator vira um modo de falha silencioso lá na aplicação. Endurecer cedo, com mensagens que ensinam.

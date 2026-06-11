@@ -77,9 +77,6 @@ Por padrão (convenção A, FIX-001) as âncoras `before`/`after` permanecem e o
 ### 2026-06-10 — Modo `--self-test` (rodar a demo embutida)
 Um comando que aplica a `examples/demo.yaml` num diretório temporário e reverte, confirmando que a instalação está sã (estratégias, backup, rollback) num único passo. Bom como verificação pós-instalação e como ensino vivo do fluxo.
 
-### 2026-06-10 — ⭐ Kit de "ensino" para a IA geradora (INSTRUCTION_GUIDE) — PRIORITÁRIO
-O consumidor real da ferramenta é a IA que gera instruções. Antes de usá-la como beta tester em outros projetos, criar o documento (ou par de documentos) que entra no contexto de qualquer projeto e ensina a IA a emitir instruções corretas de primeira: regras das âncoras de contexto (new_content = só o miolo; `after` distintivo para linguagens com `}` aninhado — usar `"\n}"` da coluna 0 ou trecho do código seguinte), decoradores devem ser repetidos no `new_content`, `occurrence` apenas quando a repetição é intencional (DEC-011), caminhos Windows com `\\` ou `/`, arquivos em UTF-8 (BOM ok; UTF-16 não), preferir estratégias semânticas para .py/.json e contexto para o resto, checklist de autovalidação antes de emitir. Formato candidato: `INSTRUCTION_GUIDE.md` (referência completa) + bloco curto "system prompt" pronto para colar. Solicitado pelo usuário em 2026-06-10; é o próximo entregável natural antes/junto da F2.
-
 ### 2026-06-10 — Modo estrito opcional no `set_json_path` (`create_missing: false`)
 Hoje `set_json_path` cria intermediários ausentes por design (útil para adicionar config nova), mas um typo no caminho (`aip.version`) cria um galho paralelo silenciosamente. Um campo opcional `create_missing: false` permitiria à IA marcar "este caminho DEVE existir" quando a intenção é atualizar valor existente. Default permanece `true` (compatibilidade). Surgiu na auditoria de erros silenciosos.
 
@@ -95,6 +92,7 @@ FIX-002 rejeita UTF-16/32 com erro claro pedindo conversão. Se aparecerem proje
 - **CLI funcional sem GUI (F1)** — implementado (`python -m src` com `validate`/`apply`/`rollback`).
 - **`requirements` em camadas (núcleo sem Qt)** — implementado em F1 (DEC-010): `requirements.txt` + `requirements-gui.txt` + `requirements-dev.txt`.
 - **Estratégias de arquivo inteiro (`create_file`/`replace_file`)** — implementadas em F1 (DEC-008): permitem criar um projeto do zero ou fazer patch cirúrgico na mesma instrução.
+- **Kit de "ensino" para a IA geradora** — entregue em 2026-06-10 (DEC-012): `docs/INSTRUCTION_GUIDE.md` + `docs/PROMPT_IA.md`, validados por dogfooding (instrução escrita só com o guia aplicou C# com BOM, Python decorado e TSX).
 
 ---
 

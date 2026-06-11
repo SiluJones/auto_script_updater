@@ -14,7 +14,7 @@ Ferramenta desktop em Python que aplica automaticamente modificações a arquivo
 - **Parsing de instrução:** PyYAML + jsonschema
 - **Manipulação Python:** libcst 1.x (Concrete Syntax Tree — preserva comentários e espaçamento)
 - **Manipulação texto/MD/TXT:** `re` + `difflib` (stdlib)
-- **Manipulação JSON:** `json` (stdlib) + jmespath (navegação por caminho)
+- **Manipulação JSON:** `json` (stdlib) + navegador de caminho próprio (`a.b[0].c`; jmespath removido no FIX-005)
 - **Testes:** pytest + pytest-qt
 - **Packaging:** PyInstaller (executável `.exe` standalone Windows)
 - **Formato de instrução:** YAML 1.2
@@ -34,7 +34,7 @@ auto_script_updater/
 │   │   ├── base_strategy.py           # ABC: interface apply() (localiza + aplica num passo)
 │   │   ├── python_strategy.py         # Estratégias Python via libcst (CST)
 │   │   ├── text_strategy.py           # Estratégias texto genérico: regex + janela de contexto
-│   │   ├── json_strategy.py           # Estratégias JSON: jmespath set/append/delete
+│   │   ├── json_strategy.py           # Estratégias JSON: set/append/delete por caminho pontilhado
 │   │   └── file_strategy.py           # Arquivo inteiro: create_file / replace_file (DEC-008)
 │   ├── gui/
 │   │   ├── main_window.py             # Janela principal + orquestração de UI
@@ -51,7 +51,7 @@ auto_script_updater/
 │   └── test_instruction_parser.py     # Testes do parser + validator
 ├── backups/                           # Backups automáticos por timestamp (gitignored)
 ├── pyproject.toml                     # Config de pytest, ruff e black
-├── requirements.txt                   # Núcleo (sem Qt): PyYAML, jsonschema, libcst, jmespath, colorama
+├── requirements.txt                   # Núcleo (sem Qt): PyYAML, jsonschema, libcst, colorama
 ├── requirements-gui.txt               # Camada GUI: PySide6
 └── requirements-dev.txt               # GUI + pytest, pytest-qt, ruff, black
 ```
@@ -89,9 +89,9 @@ instrução
 | `replace_context_block` | Qualquer | Janela de contexto: N linhas antes + N depois |
 | `replace_line_pattern` | Qualquer | Regex que casa exatamente a linha alvo |
 | `replace_section` | Markdown | Texto do heading (ex: `## Configuração`) |
-| `set_json_path` | JSON | Caminho jmespath (ex: `config.database.host`) |
-| `append_json_array` | JSON | Caminho jmespath do array + valor a inserir |
-| `delete_json_path` | JSON | Caminho jmespath do nó a remover |
+| `set_json_path` | JSON | Caminho pontilhado (ex: `config.database.host`) |
+| `append_json_array` | JSON | Caminho pontilhado do array + valor a inserir |
+| `delete_json_path` | JSON | Caminho pontilhado do nó a remover |
 | `create_file` | Qualquer | Sem localização — cria arquivo novo a partir de `content` (DEC-008) |
 | `replace_file` | Qualquer | Sem localização — substitui todo o conteúdo por `new_content` (DEC-008) |
 
@@ -112,10 +112,10 @@ instrução
 - Schema versionado com campo `format_version` — ver DEC-007.
 - Estratégias de arquivo inteiro (`create_file`/`replace_file`) unificam criar-do-zero e patch — ver DEC-008.
 - `strategy` é a fonte única de como interpretar `location` (sem `location.type`); interface da strategy é um `apply()` único — ver DEC-009.
-- Independência de linguagem via janela de contexto/regex; libcst/jmespath são reforços; `requirements` em camadas (núcleo sem Qt) — ver DEC-010.
+- Independência de linguagem via janela de contexto/regex; libcst é reforço; `requirements` em camadas (núcleo sem Qt) — ver DEC-010.
 
 ## Armadilhas Conhecidas
-1. **Localizar por número de linha absoluto** — linhas se deslocam após qualquer inserção/deleção anterior no mesmo arquivo; em instruções com várias modificações, a taxa de falha é alta → usar estratégias semânticas (nome de função, heading, jmespath) ou janela de contexto; se inevitável usar posição textual, aplicar modificações do fim para o início do arquivo.
+1. **Localizar por número de linha absoluto** — linhas se deslocam após qualquer inserção/deleção anterior no mesmo arquivo; em instruções com várias modificações, a taxa de falha é alta → usar estratégias semânticas (nome de função, heading, caminho JSON) ou janela de contexto; se inevitável usar posição textual, aplicar modificações do fim para o início do arquivo.
 
 2. **ast stdlib para reescrita Python** — `ast.unparse()` normaliza o código: remove comentários, altera espaçamento, pode trocar aspas simples por duplas → nunca usar ast para escrever de volta em disco; sempre libcst.
 

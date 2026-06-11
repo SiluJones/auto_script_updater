@@ -1,12 +1,16 @@
 """Estratégias JSON: set, append e delete por caminho.
 
-Localização (leitura) usa **jmespath** para encontrar o valor atual e dar erros
-claros; a mutação usa um navegador de caminho próprio (jmespath é só de
-consulta, não escreve). Caminhos suportados: chaves com ponto e índices de
-lista — ``a.b.c`` e ``a.b[0].c`` — que cobrem o uso documentado.
+Caminhos suportados: chaves com ponto e índices de lista — ``a.b.c`` e
+``a.b[0].c``. A navegação (leitura e escrita) usa um navegador próprio que,
+diferente de bibliotecas de consulta como jmespath, **distingue "chave
+ausente" de "valor null"** (FIX-005) — sem isso, era impossível deletar uma
+chave cujo valor é ``null``.
 
-O arquivo é parseado como JSON, mutado em memória e reserializado com
-``indent=2`` e ``ensure_ascii=False`` (preserva acentuação) + newline final.
+Estilo de serialização (FIX-004): o estilo do arquivo ORIGINAL é detectado e
+preservado — indentação (2/4/tab), formato compacto de uma linha e presença
+do newline final. Antes, tudo era reserializado com ``indent=2``, o que
+reformatava o arquivo inteiro e explodia o diff. ``ensure_ascii=False``
+preserva acentuação.
 """
 
 from __future__ import annotations
@@ -20,15 +24,11 @@ from .base_strategy import BaseStrategy, StrategyError, get_location
 
 _TOKEN_RE = re.compile(r"\.?([^.\[\]]+)|\[(\d+)\]")
 
+# Primeira linha indentada de um JSON multilinha: captura a indentação base.
+_INDENT_RE = re.compile(r'\n([ \t]+)["{\[\d]')
 
-def _require_jmespath():
-    try:
-        import jmespath  # noqa: WPS433
-    except ImportError as exc:  # pragma: no cover
-        raise StrategyError(
-            "Estratégias JSON exigem 'jmespath'. Instale com: pip install jmespath"
-        ) from exc
-    return jmespath
+# Sentinela para distinguir "não achei" de "achei o valor None (null)".
+_MISSING = object()
 
 
 def _parse_json(source: str) -> Any:
@@ -40,8 +40,30 @@ def _parse_json(source: str) -> Any:
         raise StrategyError(f"O arquivo JSON é inválido: {exc}.") from exc
 
 
-def _dump_json(data: Any) -> str:
-    return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+def _detect_style(source: str) -> tuple[int | str | None, str]:
+    """Detecta (indent, trailing_newline) do JSON original.
+
+    indent: nº de espaços, "\\t" para tab, ou None para formato compacto
+    (uma linha). Para fonte vazia (arquivo novo), usa o padrão (2, "\\n").
+    """
+    if source.strip() == "":
+        return 2, "\n"
+    trailing = "\n" if source.endswith("\n") else ""
+    m = _INDENT_RE.search(source)
+    if not m:
+        return None, trailing  # compacto: sem linha indentada
+    ws = m.group(1)
+    if ws.startswith("\t"):
+        return "\t", trailing
+    return len(ws), trailing
+
+
+def _dump_json(data: Any, source: str) -> str:
+    """Serializa preservando o estilo do original (FIX-004)."""
+    indent, trailing = _detect_style(source)
+    if indent is None:
+        return json.dumps(data, ensure_ascii=False, separators=(", ", ": ")) + trailing
+    return json.dumps(data, indent=indent, ensure_ascii=False) + trailing
 
 
 def _tokenize(path: str) -> list[Any]:
@@ -59,12 +81,23 @@ def _tokenize(path: str) -> list[Any]:
     return tokens
 
 
-def _check_exists(jmespath, data: Any, path: str) -> Any:
-    """Usa jmespath para ler o valor atual (None se ausente)."""
-    try:
-        return jmespath.search(path, data)
-    except Exception:  # pragma: no cover - jmespath é tolerante
-        return None
+def _walk(data: Any, tokens: list[Any]) -> Any:
+    """Caminha pelos tokens. Retorna o valor encontrado ou ``_MISSING``.
+
+    Diferente do jmespath, devolve o valor REAL mesmo quando é ``None`` (null
+    no JSON) — ausência é sinalizada pela sentinela, não por None (FIX-005).
+    """
+    cursor = data
+    for tok in tokens:
+        if isinstance(tok, str):
+            if not isinstance(cursor, dict) or tok not in cursor:
+                return _MISSING
+            cursor = cursor[tok]
+        else:
+            if not isinstance(cursor, list) or tok >= len(cursor):
+                return _MISSING
+            cursor = cursor[tok]
+    return cursor
 
 
 class SetJsonPath(BaseStrategy):
@@ -104,7 +137,7 @@ class SetJsonPath(BaseStrategy):
             if not isinstance(cursor, list) or last >= len(cursor):
                 raise StrategyError(f"Índice [{last}] inválido para atribuição em {path!r}.")
             cursor[last] = value
-        return _dump_json(data)
+        return _dump_json(data, source)
 
 
 class AppendJsonArray(BaseStrategy):
@@ -113,21 +146,25 @@ class AppendJsonArray(BaseStrategy):
     name = "append_json_array"
 
     def apply(self, source: str, modification: Mapping[str, Any]) -> str:
-        jmespath = _require_jmespath()
         location = get_location(modification)
         path = location["path"]
         value = modification.get("value")
         data = _parse_json(source)
 
-        target = _check_exists(jmespath, data, path)
-        if target is None:
+        target = _walk(data, _tokenize(path))
+        if target is _MISSING:
             raise StrategyError(f"Caminho {path!r} não existe; não há lista para anexar.")
+        if target is None:
+            raise StrategyError(
+                f"Caminho {path!r} existe mas vale null, não uma lista. "
+                "Use set_json_path para defini-lo como lista primeiro."
+            )
         if not isinstance(target, list):
             raise StrategyError(
                 f"Caminho {path!r} aponta para {type(target).__name__}, não uma lista."
             )
         target.append(value)
-        return _dump_json(data)
+        return _dump_json(data, source)
 
 
 class DeleteJsonPath(BaseStrategy):
@@ -136,25 +173,19 @@ class DeleteJsonPath(BaseStrategy):
     name = "delete_json_path"
 
     def apply(self, source: str, modification: Mapping[str, Any]) -> str:
-        jmespath = _require_jmespath()
         location = get_location(modification)
         path = location["path"]
         data = _parse_json(source)
         tokens = _tokenize(path)
 
-        if _check_exists(jmespath, data, path) is None:
+        # Existência via navegador próprio: um valor null EXISTE e é removível.
+        if _walk(data, tokens) is _MISSING:
             raise StrategyError(f"Caminho {path!r} não existe; nada a remover.")
 
-        cursor = data
-        for tok in tokens[:-1]:
-            cursor = cursor[tok] if isinstance(tok, str) else cursor[tok]
-
+        cursor = _walk(data, tokens[:-1]) if len(tokens) > 1 else data
         last = tokens[-1]
         try:
-            if isinstance(last, str):
-                del cursor[last]
-            else:
-                del cursor[last]
+            del cursor[last]
         except (KeyError, IndexError, TypeError) as exc:  # pragma: no cover
             raise StrategyError(f"Falha ao remover {path!r}: {exc}.") from exc
-        return _dump_json(data)
+        return _dump_json(data, source)

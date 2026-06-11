@@ -107,6 +107,17 @@ def _read_target(path: Path, encoding: str) -> tuple[str, str, str]:
                 "converta o arquivo para UTF-8 antes de aplicar a instrução."
             )
 
+    # Guarda de binário (FIX-006): cp1252 "decodifica" quase qualquer byte, então
+    # um .png/.exe apontado por engano viraria "texto" — e um replace_file o
+    # sobrescreveria silenciosamente. Byte NUL é o sinal universal de não-texto
+    # (também pega UTF-16 SEM BOM, que intercala NULs).
+    if b"\x00" in raw:
+        raise FileLocatorError(
+            f"{path}: o conteúdo contém bytes NUL — parece arquivo binário (ou texto "
+            "UTF-16 sem BOM). A ferramenta só modifica arquivos de texto em "
+            "UTF-8/CP-1252; verifique o caminho ou converta o arquivo."
+        )
+
     has_utf8_bom = raw.startswith(b"\xef\xbb\xbf")
     candidatos = (
         ("utf-8-sig",)

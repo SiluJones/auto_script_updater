@@ -78,6 +78,18 @@ python -m src rollback <TIMESTAMP> --root C:\meu_projeto
 Flags úteis: `--dry-run` (simula sem escrever), `--yes` (aplica sem perguntar),
 `--no-color` (saída sem cores), `--no-backup` (não recomendado).
 
+## Gerando instruções com IA (kit de ensino)
+
+Para que uma IA gere instruções corretas de primeira em **qualquer projeto seu**:
+
+1. copie `docs/INSTRUCTION_GUIDE.md` para a base de conhecimento do projeto;
+2. cole o bloco de `docs/PROMPT_IA.md` nas instruções do projeto;
+3. peça: *"emita uma instrução ASU para estas mudanças"*.
+
+O guia codifica as regras que evitam os erros clássicos (âncoras no miolo,
+`after` ambíguo, decoradores, `occurrence`, caminhos JSON) e termina com um
+checklist de autovalidação.
+
 ## Testes
 
 ```

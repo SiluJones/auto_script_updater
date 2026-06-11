@@ -21,6 +21,35 @@ class InstructionParseError(Exception):
     """Falha de I/O ou de sintaxe ao ler/parsear o arquivo de instrução."""
 
 
+class _StrictLoader(yaml.SafeLoader):
+    """SafeLoader que rejeita chaves duplicadas (FIX-006).
+
+    O PyYAML padrão aceita ``{a: 1, a: 2}`` silenciosamente (a última vence) —
+    num arquivo gerado por IA, uma chave repetida faria metade da instrução
+    evaporar sem aviso. Aqui, duplicata vira erro de parse com linha/coluna.
+    """
+
+
+def _construct_mapping_no_dups(loader: _StrictLoader, node: yaml.MappingNode, deep: bool = False):
+    mapping: dict[Any, Any] = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in mapping:
+            raise yaml.constructor.ConstructorError(
+                None,
+                None,
+                f"chave duplicada no YAML: {key!r} (a primeira ocorrência seria descartada)",
+                key_node.start_mark,
+            )
+        mapping[key] = loader.construct_object(value_node, deep=deep)
+    return mapping
+
+
+_StrictLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping_no_dups
+)
+
+
 # Ordem de tentativa de encoding ao abrir o arquivo.
 # UTF-8 primeiro; CP-1252 como contingência para arquivos legados do Windows
 # sem BOM (ver Armadilha #3 no CONTEXT.md).
@@ -92,9 +121,9 @@ def _read_text_with_fallback(file_path: Path) -> str:
 
 
 def _parse(text: str, *, source: str) -> dict[str, Any]:
-    """Faz ``yaml.safe_load`` e garante que o resultado é um objeto (mapeamento)."""
+    """Parseia com o loader estrito e garante que o resultado é um mapeamento."""
     try:
-        data = yaml.safe_load(text)
+        data = yaml.load(text, Loader=_StrictLoader)  # noqa: S506 (SafeLoader estendido)
     except yaml.YAMLError as exc:
         raise InstructionParseError(f"YAML/JSON inválido em {source}: {exc}") from exc
 

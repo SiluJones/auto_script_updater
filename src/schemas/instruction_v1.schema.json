@@ -233,7 +233,7 @@
           }
         },
         {
-          "$comment": "JSON — set/append por caminho jmespath.",
+          "$comment": "JSON — set/append por caminho pontilhado (a.b[0].c).",
           "if": { "required": ["strategy"], "properties": { "strategy": { "enum": ["set_json_path", "append_json_array"] } } },
           "then": {
             "required": ["location", "value"],
@@ -242,7 +242,7 @@
                 "type": "object",
                 "additionalProperties": false,
                 "required": ["path"],
-                "properties": { "path": { "type": "string", "minLength": 1, "description": "Caminho jmespath (ex.: 'api.version' ou 'features')." } }
+                "properties": { "path": { "type": "string", "minLength": 1, "description": "Caminho pontilhado (ex.: 'api.version' ou 'features')." } }
               }
             }
           }
@@ -257,7 +257,7 @@
                 "type": "object",
                 "additionalProperties": false,
                 "required": ["path"],
-                "properties": { "path": { "type": "string", "minLength": 1, "description": "Caminho jmespath do nó a remover." } }
+                "properties": { "path": { "type": "string", "minLength": 1, "description": "Caminho pontilhado do nó a remover (ex.: 'legacy.old_config')." } }
               }
             }
           }

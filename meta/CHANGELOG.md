@@ -5,7 +5,21 @@
 
 ## [Não lançado]
 ### Adicionado
-- *(nada ainda — próximo ciclo: guia de geração para a IA + F2/GUI)*
+- *(nada ainda — próximo ciclo: F2/GUI)*
+
+---
+
+## [0.3.0] — 2026-06-10
+### Adicionado
+- **Kit de ensino para a IA geradora (DEC-012)**: `docs/INSTRUCTION_GUIDE.md` (referência completa: estratégias, cinco regras de ouro, checklist de autovalidação) + `docs/PROMPT_IA.md` (bloco pronto para colar no contexto de outros projetos). Validado por dogfooding: instrução escrita só com o guia aplicou C# com BOM, Python decorado e TSX, com rollback íntegro. README ganhou a seção "Gerando instruções com IA".
+
+### Corrigido
+- **FIX-004:** modificações JSON preservam o estilo do arquivo original (indentação 2/4/tab, formato compacto e newline final) — antes tudo era reformatado com `indent=2`, explodindo o diff.
+- **FIX-005:** `delete_json_path` agora remove chaves de valor `null` (o jmespath confundia `null` com "ausente"); `append_json_array` distingue os dois casos. Navegação 100% própria — **jmespath removido do núcleo** (requirements: PyYAML, jsonschema, libcst, colorama).
+- **FIX-006:** intake endurecido — chave YAML duplicada vira erro de parse com linha/coluna (antes a primeira evaporava); IDs repetidos (`files[].id` / `modifications[].id`) rejeitados na validação; arquivo-alvo **binário** (byte NUL, incl. UTF-16 sem BOM) rejeitado com erro claro antes que um `replace_file` o sobrescrevesse.
+
+### Qualidade
+- Testes: 68 → **79**; ruff e black limpos; versão `0.3.0` em `__init__`/`pyproject`.
 
 ---
 

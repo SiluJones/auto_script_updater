@@ -56,7 +56,7 @@
 
 - **text_strategy** — Strategy para `.txt`, `.md` e `.py` (operações textuais genéricas). Suporta: `insert_after_pattern`, `insert_before_pattern`, `replace_context_block`, `replace_line_pattern`, `replace_section`.
 
-- **json_strategy** — Strategy para `.json` usando `jmespath` para navegação. Suporta: `set_json_path`, `append_json_array`, `delete_json_path`.
+- **json_strategy** — Strategy para `.json` com navegador de caminho próprio (caminhos pontilhados `a.b[0].c`; distingue `null` de chave ausente — FIX-005; preserva o estilo de serialização do original — FIX-004). Suporta: `set_json_path`, `append_json_array`, `delete_json_path`.
 
 - **file_strategy** — Strategy de arquivo inteiro (DEC-008), independente de tipo. Suporta: `create_file` (cria arquivo novo a partir de `content`) e `replace_file` (substitui todo o conteúdo por `new_content`). Não usa `location`.
 

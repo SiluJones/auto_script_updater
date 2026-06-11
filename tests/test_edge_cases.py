@@ -225,3 +225,138 @@ def test_python_decorator_removed_if_not_repeated():
         new_content="@cache\ndef f():\n    return 2\n",
     )
     assert out2.startswith("@cache\n")
+
+
+# ─────────────── FIX-004: estilo do JSON original preservado ───────────────
+
+
+def test_json_indent4_preserved():
+    src = '{\n    "a": 1,\n    "b": {\n        "c": 2\n    }\n}\n'
+    out = apply("set_json_path", src, location={"path": "a"}, value=9)
+    assert '\n    "a": 9' in out  # continua indent=4
+    assert '\n        "c": 2' in out
+    assert out.endswith("}\n")
+
+
+def test_json_compact_stays_compact_without_trailing_newline():
+    src = '{"a": 1, "b": 2}'  # uma linha, sem \n final
+    out = apply("set_json_path", src, location={"path": "a"}, value=9)
+    assert out == '{"a": 9, "b": 2}'  # nem multiline, nem \n adicionado
+
+
+def test_json_tab_indent_preserved():
+    src = '{\n\t"a": 1\n}\n'
+    out = apply("set_json_path", src, location={"path": "a"}, value=2)
+    assert '\n\t"a": 2' in out
+
+
+def test_json_empty_source_uses_default_style():
+    out = apply("set_json_path", "", location={"path": "a.b"}, value=1)
+    assert out == '{\n  "a": {\n    "b": 1\n  }\n}\n'
+
+
+# ─────────────── FIX-005: null é valor existente, não ausência ───────────────
+
+
+def test_delete_json_null_value_works():
+    out = apply("delete_json_path", '{"a": null, "b": 1}', location={"path": "a"})
+    import json as _json
+
+    assert _json.loads(out) == {"b": 1}
+
+
+def test_append_to_null_has_precise_error():
+    with pytest.raises(StrategyError, match="null"):
+        apply("append_json_array", '{"lst": null}', location={"path": "lst"}, value=1)
+
+
+def test_delete_missing_still_raises():
+    with pytest.raises(StrategyError, match="não existe|nao existe"):
+        apply("delete_json_path", '{"a": 1}', location={"path": "zz"})
+
+
+# ─────────────── FIX-006: intake endurecido ───────────────
+
+
+def test_yaml_duplicate_key_rejected():
+    from src.core.instruction_parser import (
+        InstructionParseError,
+        load_instruction_from_string,
+    )
+
+    with pytest.raises(InstructionParseError, match="duplicada"):
+        load_instruction_from_string("description: a\nfiles: [1]\nfiles: [2]\n")
+
+
+def test_validator_rejects_duplicate_file_ids():
+    from src.core.instruction_validator import InstructionValidationError, validate
+
+    instr = {
+        "format_version": "1.0",
+        "description": "d",
+        "files": [
+            {
+                "id": "f1",
+                "path_mode": "relative",
+                "relative_path": "a.txt",
+                "type": "text",
+                "modifications": [
+                    {"id": "m1", "description": "d", "strategy": "replace_file", "new_content": "x"}
+                ],
+            },
+            {
+                "id": "f1",
+                "path_mode": "relative",
+                "relative_path": "b.txt",
+                "type": "text",
+                "modifications": [
+                    {"id": "m1", "description": "d", "strategy": "replace_file", "new_content": "y"}
+                ],
+            },
+        ],
+    }
+    with pytest.raises(InstructionValidationError, match="repetido"):
+        validate(instr)
+
+
+def test_validator_rejects_duplicate_mod_ids_same_file():
+    from src.core.instruction_validator import InstructionValidationError, validate
+
+    instr = {
+        "format_version": "1.0",
+        "description": "d",
+        "files": [
+            {
+                "id": "f1",
+                "path_mode": "relative",
+                "relative_path": "a.txt",
+                "type": "text",
+                "modifications": [
+                    {
+                        "id": "m1",
+                        "description": "d",
+                        "strategy": "replace_file",
+                        "new_content": "x",
+                    },
+                    {
+                        "id": "m1",
+                        "description": "d2",
+                        "strategy": "create_file",
+                        "content": "y",
+                    },
+                ],
+            }
+        ],
+    }
+    with pytest.raises(InstructionValidationError, match="repetido"):
+        validate(instr)
+
+
+def test_engine_rejects_binary_file(tmp_path):
+    alvo = tmp_path / "logo.png"
+    alvo.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")  # cabeçalho PNG real
+    instr = _instr_one("logo.png", "replace_file", new_content="isto sobrescreveria um binário")
+    report = apply_instruction(instr, root_path=tmp_path, color=False)
+    assert not report.ok
+    assert "binário" in (report.files[0].error or "") or "binario" in (report.files[0].error or "")
+    assert alvo.read_bytes().startswith(b"\x89PNG")  # intocado
