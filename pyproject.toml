@@ -1,6 +1,6 @@
 [project]
 name = "auto-script-updater"
-version = "0.3.0"
+version = "0.5.1"
 description = "Aplica instruções de modificação geradas por IA a arquivos do projeto (.py, .md, .json, .txt e qualquer linguagem via contexto)."
 requires-python = ">=3.11"
 readme = "README.md"

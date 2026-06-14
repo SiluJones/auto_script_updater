@@ -1,8 +1,9 @@
 # DECISIONS.md — Registro de Decisões
 
-> Guarda o PORQUÊ — o que o código sozinho não conta.
-> Duas naturezas: **DEC** (decisões de arquitetura/design) e **FIX** (bugs graves resolvidos).
-> Não reescreva entradas antigas; se uma decisão for substituída, marque «SUPERADA por DEC-N».
+> Arquivo que **cresce devagar**. Guarda o PORQUÊ — o que o código sozinho não conta.
+> Duas naturezas: **DEC** (decisões de arquitetura/design) e **FIX** (bugs graves resolvidos, para não repetir).
+> Não reescreva entradas antigas; se uma decisão for substituída, marque «SUPERADA por DEC-N» e adicione a nova.
+> Quando passar de ~700 linhas, mova as mais antigas para `DECISIONS-archive.md`.
 
 ---
 
@@ -377,3 +378,108 @@ Bibliotecas de consulta que sinalizam ausência com `None` são armadilha em JSO
 
 ### Lição
 Camada de entrada permissiva é dívida: cada tolerância do parser/validator vira um modo de falha silencioso lá na aplicação. Endurecer cedo, com mensagens que ensinam.
+
+---
+
+## DEC-013 — GUI como camada fina sobre a pilha da F1; confiança via dry-run
+**Data:** 2026-06-11 · **Status:** aceita
+
+### Contexto
+A F2 pedia uma interface gráfica. O risco clássico é a GUI desenvolver lógica própria (segunda implementação do fluxo) e divergir do CLI.
+
+### Decisão
+`src/gui/main_window.py` consome exatamente a mesma pilha do CLI (`instruction_parser → instruction_validator → patch_engine → backup_manager`), sem nenhuma regra de negócio própria: **Pré-visualizar** = `apply_instruction(dry_run=True)`; **Aplicar** = a mesma chamada com escrita; **Desfazer** = `rollback_session` pelo timestamp da última aplicação. O indicador por arquivo (🟢/🔴/⚪) e por modificação (✓/✗) deriva do `ApplyReport`/`ModificationResult` do dry-run, cumprindo o plano da DEC-009. O diff é o `diff_renderer` sem ANSI, colorido via HTML simples. Execução síncrona nesta versão (operações locais e rápidas); worker/thread só se um caso real de lentidão aparecer. Entry point: `python -m src.gui`. Testes offscreen (`QT_QPA_PLATFORM=offscreen`) cobrem o circuito preview→apply→undo e a marcação de falha; `pytest.importorskip` mantém o core testável sem PySide6.
+
+### Consequências
+- Zero duplicação de lógica: todo endurecimento do engine (DEC-011, FIX-002…) vale automaticamente na GUI.
+- O 🟡 (aviso) entra quando existir canal de warnings no engine (IDEAS).
+
+---
+
+## DEC-014 — Falha com dica acionável; nunca fuzzy matching silencioso
+**Data:** 2026-06-11 · **Status:** aceita · **Consolida:** FIX-001, DEC-011; informa o guia (§4.2/§6)
+
+### Contexto
+Estudo dos harnesses de patch existentes (apply_patch/V4A da OpenAI, Aider, Claude Code, Cursor): o V4A aplica *fuzzy matching progressivo* (exato → ignora line-endings → ignora whitespace) para tolerar âncoras imperfeitas; o Aider responde com sugestões "did you mean"; o Claude Code exige string exata e única. A falha nº 1 de âncoras geradas por IA é whitespace divergente (espaços × tab, 4 × 8 espaços).
+
+### Decisão
+O ASU **não aplica** correspondência aproximada silenciosa (poderia acertar o lugar errado sem sinal — a classe de bug que esta ferramenta combate). Em vez disso, adota o princípio do erro acionável: quando uma âncora (`before`/`after`) não casa exato mas existe trecho equivalente módulo whitespace, o `StrategyError` aponta **a linha** e mostra **a forma exata** do arquivo para o gerador copiar (`_whitespace_hint`). Combinado com a tabela "erro → correção" do guia (§6), isso fecha o loop de autocorreção: a IA geradora corrige a instrução no turno seguinte — mesmo desenho que faz o V4A funcionar, com a segurança do match exato do Claude Code.
+
+### Alternativas consideradas
+- **Fuzzy progressivo como o V4A** — máxima conveniência, mas reintroduz aplicação em local potencialmente errado sem aviso → rejeitado como padrão; registrado em IDEAS como possível *opt-in* explícito (`allow_whitespace_fuzz: true`) se o uso real implorar.
+
+### Consequências
+- Mensagens de erro são interface de produto: novas falhas comuns devem ganhar dica + linha na tabela §6 do guia.
+
+---
+
+## DEC-015 — Sandbox como cópia irmã visível (`apply --sandbox`)
+**Data:** 2026-06-12 · **Status:** aceita · **Origem:** ideia do usuário (workflow de duplicata)
+
+### Contexto
+Para os primeiros usos em projetos grandes, o usuário propôs aplicar numa duplicata e só promover o resultado depois de validar. Fazer isso à mão funciona, mas é fricção repetida — e fricção de segurança tende a ser pulada.
+
+### Decisão
+Flag `--sandbox` no `apply`: duplica a raiz numa **pasta irmã visível** `<nome>_sandbox_<timestamp>` (não um tempdir autodeletável — o objetivo é inspecionar e comparar com calma), ignorando pesos mortos (`.git`, `node_modules`, venvs, `backups/`, caches, `dist/build`, IDE). Toda a aplicação (prévia, confirmação, backup, rollback) acontece na cópia; ao final, o CLI imprime o caminho e orienta revisar/promover/apagar. **Instruções com `path_mode: absolute` são recusadas** nesse modo: um caminho absoluto escaparia da cópia por definição — recusar é mais honesto que redirecionar magicamente.
+
+### Alternativas consideradas
+- **Tempdir autodeletável** — some antes da inspeção → descartado.
+- **Redirecionar caminhos absolutos para dentro da sandbox** — reescrita mágica de caminhos é exatamente o tipo de surpresa que o projeto evita → recusar com erro claro.
+
+### Consequências
+- O "modo seguro" do README vira um comando; o fluxo manual e o fluxo Git continuam documentados como alternativas.
+- Cópia de raízes muito grandes tem custo de disco/tempo mesmo com ignores — aceitável para a fase de confiança; não é o modo padrão.
+
+---
+
+## FIX-007 — GUI: estado entre prévia, aplicação e desfazer (2 bugs da v0.4.0)
+**Data:** 2026-06-12 · **Status:** corrigido
+
+### Sintomas
+1. **(a) Desfazer com raiz errada:** `undo_last` lia a raiz do CAMPO no momento do clique. Se o usuário trocasse a pasta raiz entre Aplicar e Desfazer, o rollback procurava `backups/<ts>` no lugar errado (FileNotFound na melhor hipótese; em tese, num projeto com backups próprios, reverteria a sessão errada).
+2. **(b) Prévia desatualizada aplicada:** `Aplicar` relia a instrução do disco. Editar o YAML (você ou a IA) entre a prévia e o clique aplicava **algo diferente do que foi revisado**, sem aviso — quebra a promessa central do fluxo "revise o diff antes".
+
+### Correção
+(a) A aplicação captura `(raiz_usada, timestamp)` no momento de escrever; o Desfazer usa o par capturado, ignorando o campo atual. (b) A prévia registra uma impressão digital SHA-256 de `(raiz + conteúdo da instrução)`; o Aplicar recalcula e, se divergir (ou não houver prévia), bloqueia com aviso e exige nova prévia. Qualquer edição dos campos invalida a prévia (botão Aplicar desabilita). Testes offscreen cobrem os dois cenários.
+
+### Lição
+GUI tem ESTADO entre cliques — todo dado usado por uma ação posterior deve ser capturado no momento do compromisso (aplicação), nunca relido da interface, que o usuário pode ter mudado.
+
+---
+
+## FIX-008 — Backup estourava o MAX_PATH no Windows (5 testes + self-test quebrados)
+**Data:** 2026-06-13 · **Status:** corrigido
+
+### Sintoma
+No Windows, toda aplicação COM backup falhava com `FileNotFoundError: [WinError 3] O sistema não pode encontrar o caminho especificado`. Atingia 5 testes (`test_cli_sandbox_applies_on_copy_not_original`, os 4 de GUI que aplicam de verdade) e o `python -m src self-test` (que reportava "rollback não removeu o arquivo criado", porque a escrita falhava no meio). No Linux/CI tudo passava — o bug era invisível fora do Windows. (Relatado via `260613-console.txt`.)
+
+### Causa raiz
+O `backup_manager.mirror_path` espelhava o caminho **absoluto inteiro** do arquivo dentro de `backups/<ts>/`. Ex.: backup de `C:\...\Temp\...\projeto_sandbox_X\cfg.json` virava `...\projeto_sandbox_X\backups\<ts>\Users\alexk\AppData\Local\Temp\...\projeto_sandbox_X\cfg.json`. Esse aninhamento dobra o comprimento do caminho a cada nível; com o `AppData\Local\Temp` do pytest + a pasta `_sandbox_`, passava de 260 caracteres (limite MAX_PATH do Windows, ativo por padrão) e o `mkdir` falhava. No Linux os caminhos de teste (`/tmp/...`) eram curtos demais para atingir qualquer limite — por isso o CI no container nunca pegou. Falha de portabilidade clássica: o teste passava no ambiente errado.
+
+### Correção
+O espelho de backup passou a ser **relativo à raiz do projeto** (`backups/<ts>/<caminho_relativo>`), curto e portável. O `BackupManager` recebe a raiz (`root=`) e usa `relative_to`; arquivos fora da raiz (ou `path_mode=absolute`) caem num esquema raso `_abs/<drive>/<resto>` (sem recriar a árvore absoluta inteira). O `manifest.txt` agora grava o caminho-espelho EXPLÍCITO (`estado<TAB>original<TAB>espelho`), eliminando a heurística de recálculo no rollback; o formato antigo de manifesto ainda é lido por retrocompatibilidade. `mirror_path` permanece como função legada só para ler manifestos pré-FIX.
+
+### Lição
+Um teste verde no Linux não cobre o limite de caminho do Windows. Para um produto Windows-first, casos sensíveis a caminho (backup, cópia, sandbox) precisam (a) usar caminhos relativos/curtos por princípio e (b) idealmente rodar num CI Windows. Registrado em IDEAS o item de CI Windows.
+
+---
+
+## DEC-016 — Verificação pós-aplicação pela IA: olhar o disco, não o relato
+**Data:** 2026-06-13 · **Status:** aceita · **Origem:** ideia do usuário (ideia-260613) + pesquisa
+
+### Contexto
+O usuário propôs que, após o usuário aplicar uma instrução ASU e reabrir o projeto numa sessão seguinte, a IA verifique se cada arquivo tocado ficou como esperado — mesmo sem queixa — para pegar discrepâncias nos primeiros pilotos. Antes de aceitar, pesquisei a prática da indústria (princípio "pesquisa para refinar E refutar").
+
+### Evidência (pesquisa 2026-06-13)
+A literatura é convergente e forte: agentes de código emitem "linguagem de conclusão" ('apliquei', 'tudo certo') como **padrão de saída, independentemente do estado real** dos arquivos (DEV/CrisisCore, "AI coding agents lie about their work"). A verificação confiável é **outcome-based**: cruzar a afirmação com o **arquivo no disco**, não com a transcrição. ReVeal e TDAD mostram ganho real de geração-com-verificação (TDAD: −70% de regressões surfacing *qual* verificar, vs. piora quando se prescreve processo sem contexto). Conclusão: a ideia do usuário é validada — com a ressalva de que a verificação deve LER o arquivo, não perguntar "deu certo?".
+
+### Decisão
+Adicionada a **§8 "Verificação pós-aplicação"** ao `INSTRUCTION_GUIDE.md` e um item ao `PROMPT_IA.md`: quando a IA emitiu uma instrução ASU e, na sessão seguinte, tem os arquivos à vista, deve conferir no disco cada arquivo/modificação tocado antes de seguir; se bateu, uma linha confirma; se não, aponta arquivo+modificação e propõe correção. Sem relatório quando está tudo certo (evita ruído).
+
+### Alternativas consideradas
+- **Perguntar ao usuário "funcionou?"** — não pega a discrepância sutil (mudança no lugar errado que o usuário não notou) → insuficiente, descartado como método principal.
+- **Verificação automática pela ferramenta (pós-apply)** — a ferramenta já garante que aplicou o que o localizador casou; o que falta verificar é se o resultado é o que o usuário QUERIA (semântico) — isso é trabalho de IA com contexto, não do motor. Mantido no guia, não no código.
+
+### Consequências
+- A IA geradora vira parte do loop de verificação nos primeiros usos, onde a confiança se forma.
+- A ideia de "arquivo de relatório de feedback" (parte da mesma proposta) foi avaliada à parte — ver IDEAS (recomendação: NÃO criar arquivo dedicado; usar o canal que já existe).

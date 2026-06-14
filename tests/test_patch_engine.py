@@ -247,3 +247,71 @@ def test_rollback_session_roundtrip(tmp_path):
     ts = report.backup_dir.split("/")[-1].split("\\")[-1]
     rollback_session(tmp_path, ts)
     assert json.loads(f.read_text(encoding="utf-8"))["v"] == 1
+
+
+# ─────────────── CLI: apply --sandbox (modo seguro) ───────────────
+
+
+def test_cli_sandbox_applies_on_copy_not_original(tmp_path, monkeypatch):
+    """--sandbox duplica a raiz e aplica na cópia; o original fica intacto."""
+    import json as _json
+
+    from src.__main__ import main
+
+    raiz = tmp_path / "projeto"
+    (raiz / "node_modules").mkdir(parents=True)  # deve ser ignorada na cópia
+    (raiz / "node_modules" / "pesado.js").write_text("x", encoding="utf-8")
+    (raiz / "cfg.json").write_text('{"v": 1}\n', encoding="utf-8")
+
+    instr = tmp_path / "i.yaml"
+    instr.write_text(
+        "format_version: '1.0'\n"
+        "description: sandbox test\n"
+        "files:\n"
+        "  - id: f1\n"
+        "    path_mode: relative\n"
+        "    relative_path: cfg.json\n"
+        "    type: json\n"
+        "    modifications:\n"
+        "      - {id: m1, description: d, strategy: set_json_path,\n"
+        "         location: {path: v}, value: 2}\n",
+        encoding="utf-8",
+    )
+
+    rc = main(["apply", str(instr), "--root", str(raiz), "--sandbox", "--yes", "--no-color"])
+    assert rc == 0
+    # original intacto
+    assert _json.loads((raiz / "cfg.json").read_text(encoding="utf-8"))["v"] == 1
+    # sandbox criada como irmã, com a mudança aplicada e sem node_modules
+    sandboxes = sorted(tmp_path.glob("projeto_sandbox_*"))
+    assert len(sandboxes) == 1
+    sb = sandboxes[0]
+    assert _json.loads((sb / "cfg.json").read_text(encoding="utf-8"))["v"] == 2
+    assert not (sb / "node_modules").exists()
+
+
+def test_cli_sandbox_rejects_absolute_paths(tmp_path, capsys):
+    from src.__main__ import main
+
+    raiz = tmp_path / "projeto"
+    raiz.mkdir()
+    alvo = tmp_path / "fora.txt"
+    alvo.write_text("x", encoding="utf-8")
+    instr = tmp_path / "i.yaml"
+    instr.write_text(
+        "format_version: '1.0'\n"
+        "description: abs\n"
+        "files:\n"
+        "  - id: f1\n"
+        "    path_mode: absolute\n"
+        f"    absolute_path: {alvo}\n"
+        "    type: text\n"
+        "    modifications:\n"
+        "      - {id: m1, description: d, strategy: replace_file, new_content: y}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit) as exc:
+        main(["apply", str(instr), "--root", str(raiz), "--sandbox", "--yes"])
+    assert exc.value.code == 2
+    assert "absolute" in capsys.readouterr().err
+    assert alvo.read_text(encoding="utf-8") == "x"  # intocado

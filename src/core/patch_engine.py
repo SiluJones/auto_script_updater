@@ -173,7 +173,9 @@ def apply_instruction(
     default_encoding = settings["encoding"]
 
     backup_root = Path(root_path) if root_path is not None else Path.cwd()
-    backup_mgr = BackupManager(backup_root) if use_backup else None
+    # A raiz encurta os espelhos de backup (caminhos relativos) — evita estourar
+    # o MAX_PATH do Windows ao aninhar caminhos absolutos sob backups/ (FIX-008).
+    backup_mgr = BackupManager(backup_root, root=backup_root) if use_backup else None
 
     report = ApplyReport(ok=True, dry_run=is_dry)
     wrote_anything = False

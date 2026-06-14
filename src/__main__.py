@@ -81,9 +81,69 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+# Pastas ignoradas ao duplicar a raiz para a sandbox (pesadas/geradas).
+_SANDBOX_IGNORES = (
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "env",
+    "node_modules",
+    "backups",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    "dist",
+    "build",
+    ".idea",
+    ".vscode",
+)
+
+
+def _make_sandbox(root: Path, instruction: dict) -> Path:
+    """Duplica a raiz numa pasta irmã ``<nome>_sandbox_<ts>`` e a devolve.
+
+    Modo seguro materializado (ideia do usuário, ver README): a instrução é
+    aplicada na CÓPIA; o projeto real não é tocado. Instruções com
+    ``path_mode=absolute`` são rejeitadas — um caminho absoluto escaparia da
+    sandbox por definição.
+    """
+    import shutil
+    from datetime import datetime
+
+    absolutos = [
+        f.get("id", "?") for f in instruction.get("files", []) if f.get("path_mode") == "absolute"
+    ]
+    if absolutos:
+        print(
+            "--sandbox não suporta instruções com path_mode=absolute "
+            f"(arquivos: {', '.join(absolutos)}) — caminhos absolutos escapariam da cópia.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    destino = root.parent / f"{root.name}_sandbox_{ts}"
+    shutil.copytree(root, destino, ignore=shutil.ignore_patterns(*_SANDBOX_IGNORES))
+    return destino
+
+
 def _cmd_apply(args: argparse.Namespace) -> int:
     instruction = _load_and_validate(args.instruction)
     color = not args.no_color
+
+    if getattr(args, "sandbox", False):
+        if not args.root:
+            print("--sandbox exige --root (qual projeto duplicar?).", file=sys.stderr)
+            return 2
+        original = Path(args.root)
+        if not original.is_dir():
+            print(f"--root não é uma pasta: {original}", file=sys.stderr)
+            return 2
+        sandbox = _make_sandbox(original, instruction)
+        print(f"Sandbox criada: {sandbox}")
+        print("(O projeto original NÃO será tocado; tudo abaixo aplica na cópia.)\n")
+        args.root = str(sandbox)
 
     # Pré-visualização sempre em dry-run, para o usuário conferir antes de confirmar.
     if not args.yes and not args.dry_run:
@@ -110,7 +170,71 @@ def _cmd_apply(args: argparse.Namespace) -> int:
         color=color,
     )
     _print_report(report)
+    if getattr(args, "sandbox", False) and not args.dry_run:
+        print(f"\nSandbox: {args.root}")
+        print("Revise o resultado, copie o que aprovar para o projeto real e apague a pasta.")
     return 0 if report.ok else 1
+
+
+def _cmd_self_test(args: argparse.Namespace) -> int:
+    """Valida a instalação ponta a ponta usando a demo embutida (em tempdir).
+
+    Copia ``examples/demo_project`` para um diretório temporário, aplica
+    ``examples/demo.yaml``, verifica resultados-chave, faz rollback e confere a
+    restauração. Nada fora do tempdir é tocado.
+    """
+    import shutil
+    import tempfile
+
+    base = Path(__file__).resolve().parent.parent  # raiz do repo (acima de src/)
+    demo_yaml = base / "examples" / "demo.yaml"
+    demo_proj = base / "examples" / "demo_project"
+    if not demo_yaml.is_file() or not demo_proj.is_dir():
+        print(
+            "self-test indisponível: examples/demo.yaml ou examples/demo_project ausentes.",
+            file=sys.stderr,
+        )
+        return 2
+
+    instruction = _load_and_validate(str(demo_yaml))
+    falhas: list[str] = []
+    with tempfile.TemporaryDirectory(prefix="asu_selftest_") as tmp:
+        raiz = Path(tmp) / "demo_project"
+        shutil.copytree(demo_proj, raiz)
+
+        report = apply_instruction(instruction, root_path=raiz, color=False)
+        if not report.ok:
+            falhas.append("apply falhou: " + "; ".join(f.error or f.status for f in report.files))
+        else:
+            calc = (raiz / "src" / "calculator.py").read_text(encoding="utf-8")
+            if "Divisão por zero" not in calc:
+                falhas.append("método Python não foi substituído")
+            if not (raiz / "src" / "health.py").exists():
+                falhas.append("create_file não criou src/health.py")
+            cfg = (raiz / "config.json").read_text(encoding="utf-8")
+            if '"2.0.0"' not in cfg or '"logging"' in cfg and "deprecated_flag" in cfg:
+                if '"2.0.0"' not in cfg:
+                    falhas.append("set_json_path não atualizou a versão")
+
+            ts = Path(report.backup_dir).name if report.backup_dir else None
+            if not ts:
+                falhas.append("backup não foi criado")
+            else:
+                rollback_session(raiz, ts)
+                calc2 = (raiz / "src" / "calculator.py").read_text(encoding="utf-8")
+                if "Divisão por zero" in calc2:
+                    falhas.append("rollback não restaurou calculator.py")
+                if (raiz / "src" / "health.py").exists():
+                    falhas.append("rollback não removeu o arquivo criado")
+
+    if falhas:
+        print("SELF-TEST FALHOU:", file=sys.stderr)
+        for f in falhas:
+            print(f"  - {f}", file=sys.stderr)
+        return 1
+    print("SELF-TEST OK — parser, validador, 5 estratégias, backup e rollback funcionando.")
+    print("(Tudo executado em diretório temporário; nada do seu disco foi tocado.)")
+    return 0
 
 
 def _cmd_rollback(args: argparse.Namespace) -> int:
@@ -147,9 +271,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_app.add_argument(
         "--no-backup", action="store_true", help="Não criar backup (não recomendado)."
     )
+    p_app.add_argument(
+        "--sandbox",
+        action="store_true",
+        help="Aplica numa CÓPIA da raiz (pasta irmã *_sandbox_<ts>); o original não é tocado.",
+    )
     p_app.add_argument("--no-color", action="store_true", help="Saída sem cores ANSI.")
     p_app.add_argument("--yes", "-y", action="store_true", help="Aplica sem pedir confirmação.")
     p_app.set_defaults(func=_cmd_apply)
+
+    p_st = sub.add_parser(
+        "self-test", help="Valida a instalação aplicando a demo embutida num diretório temporário."
+    )
+    p_st.set_defaults(func=_cmd_self_test)
 
     p_rb = sub.add_parser("rollback", help="Desfaz uma aplicação a partir do timestamp do backup.")
     p_rb.add_argument("timestamp", help="Timestamp da sessão (ex.: 20260607_231500).")

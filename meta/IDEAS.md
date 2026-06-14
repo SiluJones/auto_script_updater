@@ -1,11 +1,19 @@
 # IDEAS.md — Brainstorm e Visão
 
 > **Segundo cérebro** do projeto. Captura TUDO que for mencionado, mesmo solto ou no meio de outro assunto.
-> Nunca perde: ideia implementada → «Concluídas»; recusada → «Descartadas» com motivo.
+> Nunca perde: ideia implementada vai para «Concluídas»; ideia recusada vai para «Descartadas» com o motivo.
+> Separar por autor (você × assistente) ajuda a lembrar de onde veio cada coisa.
 
 ---
 
 ## 💡 Ideias Ativas — Usuário
+
+### 2026-06-13 — Verificação pós-aplicação pela IA (na sessão seguinte) — ACEITA, ver DEC-016
+Depois que o usuário aplica uma instrução ASU e reabre o projeto, a IA deve conferir cada arquivo tocado para ver se ficou como esperado, mesmo sem queixa — ajuda a achar discrepâncias nos primeiros pilotos. **Pesquisada e validada** (agentes de código emitem "linguagem de conclusão" independentemente do estado real; verificação confiável é *outcome-based*, lendo o disco, não o relato — DEV/CrisisCore; ReVeal; TDAD −70% regressões). Implementada como §8 do INSTRUCTION_GUIDE + item no PROMPT_IA. Ressalva aplicada: verificar LENDO o arquivo, nunca perguntando "deu certo?".
+
+### 2026-06-13 — Refinamento por tipo/linguagem de arquivo (grupos) — PARCIAL, no momento certo
+Pergunta do usuário: vale refinar o tratamento por tipo (.py, .json, .md, .tsx, .jsx, .java, .c, .cpp, .css, .cs, .gd, .js, .html), agrupados por linguagem/família? Resposta curta: **sim, mas sob demanda, guiado pelo uso real** — não especular agora. Hoje a cobertura é: semântica para .py (libcst) e .json (navegador próprio); contexto/regex universal para TODO o resto (provado em teste com C#, C++, Java, JSX, TSX, GDScript). O mecanismo universal JÁ edita .md/.txt/.css/.html/.gd etc. com segurança. Refinamento semântico por linguagem (ex.: tree-sitter para JS/TS/Java/C#) só compensa quando um caso real mostrar que o contexto não basta — e aí entra UMA família por vez (ver ideia tree-sitter do assistente). Famílias candidatas por prioridade de uso: web (ts/tsx/jsx/js/css/html) > JVM/C-like (java/c/cpp/cs) > nicho (gd). Decisão: aguardar o dogfooding em projetos reais apontar onde dói.
+
 
 ### 2026-06 — Ferramenta desktop de aplicação de instruções de IA
 Ferramenta que lê arquivo de instrução gerado pela IA e aplica modificações a scripts e documentos do projeto automaticamente, com prévia e rollback. Núcleo do projeto.
@@ -74,8 +82,14 @@ Hoje cada modificação resulta em ok ou erro. Um terceiro nível de *aviso* per
 ### 2026-06-10 — Flag opcional `include_anchors` no `replace_context_block`
 Por padrão (convenção A, FIX-001) as âncoras `before`/`after` permanecem e o `new_content` é só o miolo. Uma flag opt-in `include_anchors: true` permitiria a convenção B (substituir o bloco INTEIRO, âncoras inclusas) para quem achar mais natural reescrever a função/bloco completo. Manter o default em A; só adicionar se o uso real pedir.
 
-### 2026-06-10 — Modo `--self-test` (rodar a demo embutida)
-Um comando que aplica a `examples/demo.yaml` num diretório temporário e reverte, confirmando que a instalação está sã (estratégias, backup, rollback) num único passo. Bom como verificação pós-instalação e como ensino vivo do fluxo.
+### 2026-06-11 — Workflow "sandbox por duplicata" (ideia do usuário)
+Para os primeiros usos em projetos grandes: duplicar a pasta do projeto-alvo, aplicar a instrução na duplicata, validar (inclusive subindo o resultado para a IA revisar) e só então promover ao projeto real. Documentado no README ("Modo seguro"), junto do fluxo equivalente com Git (commit antes → apply → `git diff` → `git restore`). Possível evolução de ferramenta: um comando `apply --sandbox` que copia a raiz para um tempdir, aplica lá e imprime o caminho para inspeção.
+
+### 2026-06-11 — Fuzzy matching de whitespace como OPT-IN explícito
+O apply_patch/V4A da OpenAI usa correspondência progressiva (exato → sem line-endings → sem whitespace). A DEC-014 rejeitou isso como padrão (risco de aplicar no lugar errado em silêncio), preferindo erro com dica. Se o uso real mostrar fricção excessiva, considerar `location.allow_whitespace_fuzz: true` por modificação — nunca global, nunca default.
+
+### 2026-06-11 — Anexo de erro pronto para a IA (loop de autocorreção)
+Quando `validate`/`apply` falha, oferecer um bloco "copie isto para a IA geradora" contendo: o erro, a âncora/trecho real do arquivo e a referência da regra (§ do guia). Reduz a fricção do loop usuário↔IA que a tabela §6 do guia já habilita. Na GUI, um botão "Copiar erro para a IA".
 
 ### 2026-06-10 — Modo estrito opcional no `set_json_path` (`create_missing: false`)
 Hoje `set_json_path` cria intermediários ausentes por design (útil para adicionar config nova), mas um typo no caminho (`aip.version`) cria um galho paralelo silenciosamente. Um campo opcional `create_missing: false` permitiria à IA marcar "este caminho DEVE existir" quando a intenção é atualizar valor existente. Default permanece `true` (compatibilidade). Surgiu na auditoria de erros silenciosos.
@@ -92,9 +106,21 @@ FIX-002 rejeita UTF-16/32 com erro claro pedindo conversão. Se aparecerem proje
 - **CLI funcional sem GUI (F1)** — implementado (`python -m src` com `validate`/`apply`/`rollback`).
 - **`requirements` em camadas (núcleo sem Qt)** — implementado em F1 (DEC-010): `requirements.txt` + `requirements-gui.txt` + `requirements-dev.txt`.
 - **Estratégias de arquivo inteiro (`create_file`/`replace_file`)** — implementadas em F1 (DEC-008): permitem criar um projeto do zero ou fazer patch cirúrgico na mesma instrução.
-- **Kit de "ensino" para a IA geradora** — entregue em 2026-06-10 (DEC-012): `docs/INSTRUCTION_GUIDE.md` + `docs/PROMPT_IA.md`, validados por dogfooding (instrução escrita só com o guia aplicou C# com BOM, Python decorado e TSX).
+- **Kit de "ensino" para a IA geradora** — entregue em 2026-06-10 (DEC-012); **v2 autocontida em 2026-06-11** (exemplo embutido, anti-padrões, tabela erro→correção).
+- **Modo `self-test`** — entregue em 2026-06-11: `python -m src self-test` aplica a demo em tempdir, confere e reverte.
+- **GUI mínima viável (F2)** — entregue em 2026-06-11 (DEC-013): preview/aplicar/desfazer com indicadores derivados do dry-run.
 
 ---
+
+## 📮 Feedback para o Kit
+
+> Material que volta para evoluir o Kit de Contexto — o que ESTE projeto observou sobre o próprio kit.
+
+### 2026-06-13 — Ideia de "arquivo de relatório de feedback da IA" — avaliada, recomendação: NÃO criar arquivo dedicado
+O usuário perguntou se a IA deveria gerar um arquivo-relatório quando encontrar erros/feedback (reconhecendo que seria "mais um arquivo para popular"). **Análise + pesquisa:** a literatura de agentes valoriza um *trilho de verificação auditável* — mas os sistemas reais (Swarm Orchestrator, etc.) anexam verificação ao fluxo, não criam um doc paralelo que o humano precisa manter. No nosso caso, o canal de feedback **já existe e tem dono**: discrepâncias de aplicação → a IA reporta na conversa e, se for bug da ferramenta, vira FIX no DECISIONS; feedback sobre o próprio kit → esta seção «Feedback para o Kit» do IDEAS; ideias → IDEAS. Um `RELATORIO.md` dedicado seria uma quarta fonte de verdade sobreposta às três, violando a regra de higiene "uma fonte por dado" e o próprio receio do usuário (mais um arquivo para popular). **Recomendação:** não criar. Em vez disso, a §8 do guia já manda a IA reportar discrepâncias no fluxo. SE no futuro o volume de feedback justificar persistência, o lugar natural é uma seção no log da sessão (`logs/AAAA-MM-DD.md`), não um arquivo novo. Registrado aqui para não se reabrir a discussão.
+
+### 2026-06-13 — Kit aplicado a um projeto Windows-first expôs lacuna de CI
+Este projeto roda no Windows mas é desenvolvido/testado em container Linux. O FIX-008 (MAX_PATH) passou despercebido por 5 versões porque o CI só roda Linux. Feedback ao kit: para projetos marcados como Windows-first, o kit poderia sugerir no CONTEXT/ROADMAP um lembrete de "rodar a suíte no SO alvo antes de marcar verde". Pequeno, mas teria pego o bug antes do usuário.
 
 ## 🚫 Descartadas
 - **Localização por número de linha absoluto** — frágil após modificações anteriores no mesmo arquivo; taxa de falha alta em instruções com múltiplas modificações → descartada em DEC-001.

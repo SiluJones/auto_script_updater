@@ -1,6 +1,7 @@
 # GLOSSARY.md — Termos do Projeto
 
-> Termos próprios do projeto que o assistente reexplicaria a cada sessão sem este arquivo.
+> **Opcional.** Use quando o projeto tem vocabulário próprio (nomes de módulos, conceitos, identificadores) que o assistente reexplicaria a cada sessão sem isto.
+> Mantenha curto: só o que não é óbvio para alguém de fora.
 
 ---
 

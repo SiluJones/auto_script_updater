@@ -1,7 +1,8 @@
 # CONTEXT.md — Atualizador Automático de Scripts
 
-> Arquivo **estável**. Descreve o que o projeto É, não o que está acontecendo agora (isso é o STATUS).
-> Muda só em alteração estrutural (stack, arquitetura, escopo, nova armadilha descoberta).
+> Arquivo **estável**. O assistente lê no início de cada sessão para se ambientar.
+> Muda pouco: só em alteração estrutural (stack, arquitetura, escopo, nova armadilha descoberta).
+> Mantenha enxuto — descreve o que o projeto É, não o que está acontecendo agora (isso é o STATUS).
 
 ---
 

@@ -66,6 +66,50 @@ def _resolve_occurrence(location: Mapping[str, Any], n_matches: int, descricao: 
     return occurrence
 
 
+def _normalize_ws(text: str) -> str:
+    """Colapsa indentação e espaços internos de uma linha (p/ comparação tolerante)."""
+    return re.sub(r"\s+", " ", text.strip())
+
+
+def _whitespace_hint(source: str, needle: str) -> str:
+    """Procura ``needle`` ignorando diferenças de whitespace e devolve uma dica.
+
+    Inspirado no fluxo dos harnesses de patch (apply_patch/Aider): a falha mais
+    comum de âncoras geradas por IA é indentação/espaçamento divergente do
+    arquivo real. Em vez de aplicar *fuzzy matching* silencioso (que poderia
+    acertar o lugar errado), damos um erro ACIONÁVEL: onde está o trecho
+    parecido e qual é a linha exata, para o gerador se autocorrigir.
+
+    Returns:
+        String vazia se nada parecido foi achado; senão, a dica formatada.
+    """
+    needle_norm = [_normalize_ws(ln) for ln in needle.strip("\n").splitlines() if ln.strip()]
+    if not needle_norm:
+        return ""
+    linhas = source.split("\n")
+    linhas_norm = [_normalize_ws(ln) for ln in linhas]
+    alvo = needle_norm[0]
+    for i, ln in enumerate(linhas_norm):
+        if ln != alvo:
+            continue
+        # confere as linhas seguintes da âncora multilinha (pulando vazias do arquivo)
+        ok, j = True, i
+        for parte in needle_norm[1:]:
+            j += 1
+            while j < len(linhas_norm) and linhas_norm[j] == "":
+                j += 1
+            if j >= len(linhas_norm) or linhas_norm[j] != parte:
+                ok = False
+                break
+        if ok:
+            return (
+                f" Encontrei um trecho parecido na linha {i + 1}, mas a indentação/os "
+                f"espaços diferem do arquivo. Copie a âncora EXATAMENTE como está no "
+                f"arquivo; a linha real é: {linhas[i]!r}."
+            )
+    return ""
+
+
 class _InsertPattern(BaseStrategy):
     """Insere ``content`` antes/depois da N-ésima linha que casa o regex."""
 
@@ -164,14 +208,20 @@ class ReplaceContextBlock(BaseStrategy):
         after = location["after"]
         new_content = modification.get("new_content", "")
 
-        occurrence = _resolve_occurrence(
-            location, self._count(source, before), f"Âncora 'before' {before!r}"
-        )
+        n_before = self._count(source, before)
+        if n_before == 0:
+            raise StrategyError(
+                f"Âncora 'before' não encontrada: {before!r}.{_whitespace_hint(source, before)}"
+            )
+        occurrence = _resolve_occurrence(location, n_before, f"Âncora 'before' {before!r}")
         start = self._nth_index(source, before, occurrence)
         inner_start = start + len(before)
         after_pos = source.find(after, inner_start)
         if after_pos == -1:
-            raise StrategyError(f"Âncora 'after' não encontrada depois de 'before': {after!r}.")
+            raise StrategyError(
+                f"Âncora 'after' não encontrada depois de 'before': {after!r}."
+                f"{_whitespace_hint(source[inner_start:], after)}"
+            )
         # Guarda contra o erro mais comum: incluir as próprias âncoras no
         # new_content. Como 'before'/'after' PERMANECEM no arquivo, repeti-las
         # no miolo as duplicaria — uma corrupção que, sem esta checagem, passaria

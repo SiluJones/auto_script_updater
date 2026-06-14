@@ -1,7 +1,8 @@
 # ROADMAP.md — Plano Intencional de Evolução
 
 > Médio e longo prazo vivem AQUI, não no STATUS.
-> Estado: 🟢 concluída · 🟡 em curso/próxima · 🔵 futura · 🚫 descartada.
+> **Opcional.** Use quando o projeto tem um plano em fases — não para tarefas soltas (isso é o Backlog do STATUS) nem para brainstorm (isso é o IDEAS).
+> Cada fase tem um objetivo e um critério de conclusão. Marque o estado: 🟢 concluída · 🟡 em curso/próxima · 🔵 futura · 🚫 descartada.
 
 ---
 
@@ -39,17 +40,17 @@
 
 ---
 
-## 🟡 F2 — Interface Gráfica Completa *(próxima)*
+## 🟡 F2 — Interface Gráfica Completa *(em andamento — iniciada 2026-06-11)*
 **Objetivo:** GUI completa em PySide6. Usuário abre instrução, vê diff colorido por arquivo, define pasta raiz, aplica com um clique — sem usar terminal.
 **Critério de conclusão:** Fluxo completo sem terminal: abrir instrução → validar e exibir confiança → configurar raiz → previsualizar diff → aplicar → ver resultado; rollback disponível via botão.
 
-- [ ] `src/gui/main_window.py` — janela principal, barra de menu, barra de status.
-- [ ] `src/gui/file_tree_panel.py` — árvore de arquivos afetados com ícone de status (🟢/🟡/🔴) por modificação.
+- [x] `src/gui/main_window.py` — janela principal, barra de menu, barra de status.
+- [x] Árvore de arquivos afetados com ícone de status por arquivo (🟢/🔴/⚪) e por modificação (✓/✗) — integrada na main_window; o 🟡 aguarda o canal de warnings (IDEAS).
 - [ ] `src/gui/diff_viewer.py` — visualizador de diff com syntax highlight (QSyntaxHighlighter; adições verde, remoções vermelho).
 - [ ] `src/gui/root_picker.py` — seletor de pasta raiz com histórico dos últimos 5 usos.
 - [ ] Barra de progresso durante aplicação de instruções com muitos arquivos.
-- [ ] Modo dry-run acessível via checkbox na GUI.
-- [ ] Botão "Rollback" para desfazer a última aplicação com seleção de timestamp.
+- [x] Modo dry-run na GUI — o botão "Pré-visualizar" É um dry-run (sempre antes de aplicar; desenho mais seguro que checkbox).
+- [~] Botão "Desfazer última aplicação" entregue (rollback do timestamp da sessão); seleção de timestamps antigos pendente.
 - [ ] Indicador de confiança por modificação (🟢 único / 🟡 ambíguo / 🔴 não encontrado).
 - [ ] Suporte a tema claro/escuro seguindo a preferência do sistema (Qt color scheme).
 - [ ] Botão "Colar instrução" — lê YAML da área de transferência.

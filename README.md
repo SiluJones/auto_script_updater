@@ -78,6 +78,58 @@ python -m src rollback <TIMESTAMP> --root C:\meu_projeto
 Flags úteis: `--dry-run` (simula sem escrever), `--yes` (aplica sem perguntar),
 `--no-color` (saída sem cores), `--no-backup` (não recomendado).
 
+## Interface gráfica (F2)
+
+Com as dependências de GUI instaladas (`pip install -r requirements-gui.txt`):
+
+```
+python -m src.gui
+```
+
+Escolha a raiz e a instrução, clique **Pré-visualizar (dry-run)** para ver a
+árvore de arquivos (🟢 ok / 🔴 falha, com cada modificação ✓/✗) e o diff
+colorido, depois **Aplicar** (cria backup) ou **Desfazer última aplicação**.
+
+## Verificação rápida da instalação
+
+```
+python -m src self-test
+```
+
+Aplica a demo embutida num diretório temporário, confere os resultados e
+reverte — um comando para confirmar que parser, estratégias, backup e rollback
+estão sãos na sua máquina. Nada do seu disco é tocado.
+
+## Modo seguro para os primeiros usos em projetos reais
+
+Enquanto ganha confiança, rode numa cópia — e a ferramenta faz isso por você:
+
+```
+python -m src apply instrucao.yaml --root C:\meu_projeto --sandbox
+```
+
+O `--sandbox` duplica a raiz numa pasta irmã (`meu_projeto_sandbox_<timestamp>`,
+ignorando `.git`, `node_modules`, venvs e afins), aplica **na cópia** e imprime
+o caminho — o projeto original não é tocado. Revise, copie o que aprovar e
+apague a pasta. (Instruções com `path_mode: absolute` são recusadas nesse modo,
+pois escapariam da cópia.)
+
+Manualmente, o equivalente: duplique a pasta do projeto-alvo, aplique a
+instrução na duplicata, confira o resultado e só
+então leve para o projeto real. Com Git fica ainda melhor — a working tree é a
+"duplicata" com diff e desfazer nativos:
+
+```
+git add -A & git commit -m "antes do ASU"
+python -m src apply instrucao.yaml --root . --dry-run
+python -m src apply instrucao.yaml --root .
+git diff                       (revisão fina)
+git restore .                  (desfazer tudo, se necessário)
+```
+
+As camadas de proteção do ASU (dry-run, backup automático, rollback atômico e
+por timestamp) continuam ativas em qualquer um dos fluxos.
+
 ## Gerando instruções com IA (kit de ensino)
 
 Para que uma IA gere instruções corretas de primeira em **qualquer projeto seu**:

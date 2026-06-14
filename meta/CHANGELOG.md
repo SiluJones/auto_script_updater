@@ -5,7 +5,48 @@
 
 ## [Não lançado]
 ### Adicionado
-- *(nada ainda — próximo ciclo: F2/GUI)*
+- *(nada ainda)*
+
+---
+
+## [0.5.1] — 2026-06-13
+### Corrigido
+- **FIX-008 (Windows) — backup estourava o MAX_PATH (260 chars):** o espelho de backup recriava o caminho ABSOLUTO inteiro do arquivo dentro de `backups/`, o que no Windows (com `AppData\Local\Temp` + pasta `_sandbox_`) ultrapassava o limite e quebrava com `WinError 3`. Atingia 5 testes e o `self-test` — invisível no Linux/CI (caminhos curtos). O espelho passou a ser **relativo à raiz** (`backups/<ts>/<caminho_relativo>`), o `manifest.txt` grava o espelho explícito, e o formato antigo segue legível. **Era o que derrubava o `python -m pytest` e o `self-test` na sua máquina.**
+
+### Adicionado
+- **Guia §8 "Verificação pós-aplicação" (DEC-016):** a IA, na sessão seguinte a uma instrução ASU, confere no disco cada arquivo tocado antes de seguir (em vez de confiar em "deu certo") — prática *outcome-based* validada por pesquisa. Item correspondente no `PROMPT_IA.md`.
+
+### Kit de contexto
+- CLAUDE.md alinhado à atualização do Kit (parágrafos: adaptar as Instruções do Projeto a este projeto; criar arquivo de doc ausente na primeira necessidade). Cabeçalhos dos templates atualizados ao formato novo, preservando o conteúdo do projeto.
+
+---
+
+## [0.5.0] — 2026-06-12
+### Adicionado
+- **`apply --sandbox` (DEC-015)** — o "modo seguro" virou comando: duplica a raiz numa pasta irmã `<nome>_sandbox_<ts>` (ignorando `.git`, `node_modules`, venvs, caches…), aplica NA CÓPIA e imprime o caminho; o projeto original não é tocado. Instruções com `path_mode: absolute` são recusadas nesse modo.
+- **GUI: "Colar instrução"** — usa o YAML direto da área de transferência (sem salvar arquivo), via `load_instruction_from_string`.
+- **GUI: "Copiar erro para a IA"** — em falha de validação/prévia/aplicação, copia um bloco pronto (erros + referência às §4/§6 do guia) para colar na IA geradora; fecha o loop de autocorreção na interface.
+- **GUI: lembra os últimos caminhos** (raiz e instrução) entre sessões, via QSettings.
+
+### Corrigido
+- **FIX-007a (GUI):** o Desfazer usa a raiz CAPTURADA no momento da aplicação — trocar a pasta no campo depois de aplicar não quebra mais o rollback.
+- **FIX-007b (GUI):** Aplicar exige que a instrução e a raiz sejam EXATAMENTE as da última prévia (impressão digital SHA-256); editar o YAML após revisar bloqueia com aviso e pede nova prévia.
+
+### Qualidade
+- Testes: 84 → **90** (4 da GUI nova + 2 do sandbox); ruff/black limpos; versão `0.5.0`.
+
+---
+
+## [0.4.0] — 2026-06-11
+### Adicionado
+- **GUI (F2 inicial, DEC-013)** — `python -m src.gui`: janela PySide6 fina sobre a mesma pilha do CLI. Pré-visualizar (dry-run) popula árvore de arquivos com indicador 🟢/🔴/⚪ e ✓/✗ por modificação (derivados do `ApplyReport`), diff colorido por arquivo, Aplicar com confirmação + backup, Desfazer última aplicação. Testes offscreen do circuito completo.
+- **`python -m src self-test`** — valida a instalação ponta a ponta aplicando a demo embutida em diretório temporário (e revertendo). Nada do disco do usuário é tocado.
+- **Dica acionável de whitespace nas âncoras (DEC-014)** — quando `before`/`after` não casa exato mas existe trecho equivalente módulo espaços/indentação, o erro aponta a linha e a forma exata do arquivo para copiar (estilo "did you mean" do Aider; estudo do apply_patch/V4A da OpenAI). Sem fuzzy matching silencioso.
+- **Kit de ensino v2** — `INSTRUCTION_GUIDE.md` agora é 100% autocontido: exemplo completo embutido (a v1 apontava para um arquivo fora do contexto dos projetos consumidores — causa provável do desentendimento em campo), seção de formato de resposta + anti-padrões (YAML-only, nunca XML), regra de âncora exata/multilinha e **tabela erro→correção** que fecha o loop de autocorreção da IA geradora. `PROMPT_IA.md` v2 alinhado.
+- README: seções "Interface gráfica", "Verificação rápida (self-test)" e "Modo seguro para os primeiros usos" (fluxo com duplicata e com Git).
+
+### Qualidade
+- Testes: 79 → **84** (dica de whitespace + 3 de GUI offscreen); ruff/black limpos; versão `0.4.0`.
 
 ---
 

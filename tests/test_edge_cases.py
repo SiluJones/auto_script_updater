@@ -360,3 +360,32 @@ def test_engine_rejects_binary_file(tmp_path):
     assert not report.ok
     assert "binário" in (report.files[0].error or "") or "binario" in (report.files[0].error or "")
     assert alvo.read_bytes().startswith(b"\x89PNG")  # intocado
+
+
+# ─────────────── Dica de whitespace nas âncoras (v0.4.0) ───────────────
+
+
+def test_context_anchor_whitespace_hint():
+    """Âncora com indentação divergente (espaços vs tab do arquivo) deve falhar
+    com dica acionável apontando a linha e a forma exata — não silenciar nem
+    aplicar fuzzy no lugar errado."""
+    src = "func _ready():\n\tvar x = 1\n\treturn x\n"
+    with pytest.raises(StrategyError, match="parecido na linha 1"):
+        apply(
+            "replace_context_block",
+            src,
+            location={"before": "func _ready():\n    var x = 1", "after": "return x"},
+            new_content="\tvar x = 2",
+        )
+
+
+def test_context_anchor_no_hint_when_truly_absent():
+    src = "alpha\nbeta\n"
+    with pytest.raises(StrategyError) as exc:
+        apply(
+            "replace_context_block",
+            src,
+            location={"before": "gamma_inexistente", "after": "beta"},
+            new_content="x",
+        )
+    assert "parecido" not in str(exc.value)  # nada parecido => sem dica falsa

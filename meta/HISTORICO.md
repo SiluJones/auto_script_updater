@@ -1,7 +1,7 @@
 # HISTORICO.md — Conhecimento Consolidado
 
-> Arquivo-baú para conhecimento denso já aprendido e estável.
-> Não é lido no início da sessão; consultado sob demanda quando o assunto aparece.
+> **Opcional.** Arquivo-baú para conhecimento denso que já foi aprendido e não muda mais — guias técnicos, análises de viabilidade, notas de migração — que tornariam o CONTEXT pesado demais.
+> Não é lido no início da sessão; o assistente consulta sob demanda quando o assunto aparece.
 
 ---
 
