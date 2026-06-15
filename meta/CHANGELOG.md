@@ -9,6 +9,15 @@
 
 ---
 
+## [0.5.2] — 2026-06-14
+### Corrigido
+- **FIX-009 — artefato da demo (`health.py`) vazou para o repo e quebrava 4 testes + self-test no Windows.** A `demo.yaml` cria `examples/demo_project/src/health.py` via `create_file`; numa execução anterior (provavelmente antes do FIX-008, quando o rollback no Windows não removia o criado) o arquivo ficou como resíduo e foi versionado. Os testes/self-test copiam `demo_project` e encontravam o `health.py` já presente, quebrando o `assert "não escreveu nada"`. **Não foi erro de processo do usuário — os arquivos estavam nos lugares certos.** Correção em 3 camadas: `.gitignore` ignora o artefato e `*_sandbox_*/`; a fixture de teste e o self-test limpam o que a demo gera após copiar; resíduo removido do pacote.
+
+### Documentação
+- **DEC-017** registra a separação de dois canais de feedback: sobre o **Kit de Contexto** → IDEAS › «Feedback para o Kit»; sobre o **ASU** (a ferramenta) → DEC/FIX/IDEAS/STATUS normais (não precisa de canal paralelo).
+
+---
+
 ## [0.5.1] — 2026-06-13
 ### Corrigido
 - **FIX-008 (Windows) — backup estourava o MAX_PATH (260 chars):** o espelho de backup recriava o caminho ABSOLUTO inteiro do arquivo dentro de `backups/`, o que no Windows (com `AppData\Local\Temp` + pasta `_sandbox_`) ultrapassava o limite e quebrava com `WinError 3`. Atingia 5 testes e o `self-test` — invisível no Linux/CI (caminhos curtos). O espelho passou a ser **relativo à raiz** (`backups/<ts>/<caminho_relativo>`), o `manifest.txt` grava o espelho explícito, e o formato antigo segue legível. **Era o que derrubava o `python -m pytest` e o `self-test` na sua máquina.**

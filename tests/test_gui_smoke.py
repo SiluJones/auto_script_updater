@@ -33,6 +33,14 @@ def app():
 def demo_root(tmp_path):
     raiz = tmp_path / "demo_project"
     shutil.copytree(_REPO / "examples" / "demo_project", raiz)
+    # Defesa em profundidade: a demo.yaml CRIA estes arquivos via create_file.
+    # Se algum vazou para examples/demo_project/ numa execução anterior (e foi
+    # versionado/copiado junto), o dry-run o encontraria já existindo e o
+    # assert "não escreveu nada" falharia. Garante um ponto de partida limpo.
+    for gerado in ("src/health.py",):
+        alvo = raiz / gerado
+        if alvo.exists():
+            alvo.unlink()
     return raiz
 
 

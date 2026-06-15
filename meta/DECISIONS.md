@@ -483,3 +483,44 @@ Adicionada a **§8 "Verificação pós-aplicação"** ao `INSTRUCTION_GUIDE.md` 
 ### Consequências
 - A IA geradora vira parte do loop de verificação nos primeiros usos, onde a confiança se forma.
 - A ideia de "arquivo de relatório de feedback" (parte da mesma proposta) foi avaliada à parte — ver IDEAS (recomendação: NÃO criar arquivo dedicado; usar o canal que já existe).
+
+---
+
+## FIX-009 — Artefato gerado pela demo (`health.py`) vazou para o repo e quebrou 4 testes + self-test
+**Data:** 2026-06-14 · **Status:** corrigido
+
+### Sintoma
+No Windows, `python -m pytest` dava **4 failed, 86 passed** e o `self-test` falhava com "rollback não removeu o arquivo criado". Os 4 testes de GUI falhavam todos no mesmo ponto: após um `preview()` (dry-run), `assert not (demo_root/"src"/"health.py").exists()` dava `assert not True` — ou seja, `health.py` existia quando não deveria. Diferente do FIX-008, o código estava correto (os arquivos subidos eram idênticos aos do container, que passavam); o problema era de ESTADO do repositório.
+
+### Causa raiz
+`examples/demo.yaml` CRIA `examples/demo_project/src/health.py` via `create_file`. Numa execução anterior da demo/teste dentro do repo (provavelmente antes do FIX-008, quando o rollback falhava no Windows e não removia o arquivo criado), o `health.py` ficou como **resíduo** em `examples/demo_project/src/` e foi versionado/subido junto. Os testes de GUI e o self-test copiam `demo_project` para um tempdir com `copytree` — copiando o resíduo. Aí o dry-run encontra `health.py` já presente (veio na cópia) e o `assert "não escreveu nada"` falha; no self-test, o `create_file`/rollback se confunde porque o arquivo "já existia". O `.gitignore` ignorava `backups/` mas não os artefatos gerados pela demo. Confirmado: o `health.py` subido é byte a byte o output da `demo.yaml`.
+
+### Correção
+Três camadas: (1) `.gitignore` passou a ignorar `examples/demo_project/src/health.py` e `*_sandbox_*/`; (2) a fixture `demo_root` dos testes e (3) o `self-test` removem qualquer artefato gerado pela demo logo após o `copytree` (defesa em profundidade: mesmo que o resíduo volte a vazar, os testes partem de estado limpo). O `health.py` residual foi removido do pacote. Reproduzido o cenário (com o resíduo, o erro é idêntico ao do usuário; com a correção, 90 verdes + self-test OK).
+
+### Lição
+Demo que ESCREVE dentro da própria árvore do repo é uma fonte de resíduo: o output precisa estar no `.gitignore` E os testes que copiam a fixture devem limpar o que a demo gera. "Arquivos idênticos mas testes falham" aponta para estado do ambiente (resíduo, cache, caminho), não para o código.
+
+---
+
+## DEC-017 — Dois canais de feedback distintos: Kit (no IDEAS) e ASU (no fluxo do próprio projeto)
+**Data:** 2026-06-14 · **Status:** aceita
+
+### Contexto
+Pergunta do usuário: o "Feedback para o Kit" (princípio das últimas atualizações do Kit de Contexto) é só para o Kit, ou deveria também haver feedback para o ASU "no embalo"? São coisas diferentes que estavam sendo confundidas por compartilharem a palavra "feedback".
+
+### Decisão
+São **dois canais separados, com destinos diferentes**, e ambos existem:
+
+1. **Feedback sobre o KIT DE CONTEXTO** (o meta-sistema: princípios do CLAUDE.md, templates, regras de higiene, gatilhos). Vai para `IDEAS.md` › seção «Feedback para o Kit». É o material que volta para evoluir o Kit que gerou este e outros projetos. Ex.: "o Kit deveria sugerir CI no SO alvo para projetos Windows-first" (registrado).
+
+2. **Feedback sobre o ASU** (o produto deste projeto: a ferramenta, suas estratégias, o kit de ensino da IA, a GUI). NÃO é "feedback de kit" — é trabalho normal do projeto e já tem destinos próprios pelas regras do CLAUDE.md:
+   - bug do ASU → **FIX** no `DECISIONS.md` (+ correção no código);
+   - decisão de design do ASU → **DEC** no `DECISIONS.md`;
+   - ideia/melhoria do ASU → `IDEAS.md` (seções Ativas/Concluídas/Descartadas por autor);
+   - estado do ASU → `STATUS.md`; histórico de versão → `CHANGELOG.md`.
+
+Ou seja: o ASU não precisa (nem deve) de um canal de "feedback" paralelo — ele JÁ é o objeto do projeto, então todo feedback sobre ele flui pelos documentos normais. O "Feedback para o Kit" é exclusivo do meta-nível (o Kit), porque esse sim é externo ao projeto e, sem uma seção dedicada, seu aprendizado se perderia.
+
+### Consequência / regra prática
+Ao capturar um feedback, perguntar: "isto é sobre a FERRAMENTA (ASU) ou sobre o SISTEMA QUE ORGANIZA O PROJETO (Kit)?". ASU → DEC/FIX/IDEAS/STATUS normais. Kit → «Feedback para o Kit» no IDEAS. Isso evita tanto a duplicação quanto a perda de aprendizado de meta-nível. (Decorre da regra de higiene "uma fonte de verdade por dado".)

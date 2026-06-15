@@ -7,7 +7,7 @@
 ---
 
 ## Versão Atual
-**[0.5.1-alpha]** — 2026-06-13 — **bug crítico de Windows corrigido (FIX-008):** o backup estourava o limite de 260 caracteres de caminho e derrubava 5 testes + o `self-test` na máquina do usuário (era invisível no CI Linux). Espelho de backup agora é relativo à raiz. Também nesta leva (0.5.0): `apply --sandbox` (DEC-015), GUI com Colar instrução / Copiar erro para a IA / caminhos lembrados, e dois bugs de estado da GUI corrigidos (FIX-007). Guia ganhou §8 (verificação pós-aplicação pela IA, DEC-016, validada por pesquisa). 90 testes verdes; self-test OK.
+**[0.5.2-alpha]** — 2026-06-14 — **resíduo da demo no repo corrigido (FIX-009):** um `health.py` gerado pela demo havia vazado para `examples/demo_project/` e quebrava 4 testes de GUI + o self-test no Windows (os arquivos estavam nos lugares certos — não foi erro de processo). `.gitignore` + limpeza defensiva nos testes/self-test. Antes (0.5.1): FIX-008 (backup estourava o MAX_PATH do Windows). 90 testes verdes; self-test OK.
 
 ## ✅ Funcionando
 - **CLI completo** (`python -m src`): `validate`, `apply` (com prévia em dry-run + confirmação) e `rollback <timestamp>`.
@@ -55,6 +55,7 @@
 - `src/core/backup_manager.py` — base do rollback; o formato do `manifest.txt` é lido pelo `rollback` do CLI.
 
 ## 💬 Última Sessão
+**2026-06-14 — resíduo da demo + clareza nos canais de feedback.** Diagnosticado pelo `console-260614.txt`: 4 testes de GUI + self-test falhavam porque um `health.py` (gerado pela `demo.yaml` via create_file) vazou para `examples/demo_project/` numa execução antiga e foi versionado; ao copiar a demo, os testes o encontravam já presente. Confirmado que os arquivos estavam nos lugares CERTOS (manifest ok) — não foi erro de processo. Corrigido (FIX-009): `.gitignore` + limpeza defensiva na fixture e no self-test; resíduo removido. Esclarecida (DEC-017) a separação de canais: feedback do Kit → IDEAS › «Feedback para o Kit»; feedback do ASU → DEC/FIX/IDEAS/STATUS normais. v0.5.2, 90 testes. Sessão anterior:
 **2026-06-13 — bug de Windows + verificação pós-aplicação + atualização do Kit.** Diagnosticado pelo `260613-console.txt`: o `mirror_path` do backup recriava o caminho absoluto inteiro sob `backups/`, estourando o MAX_PATH do Windows (260 chars) — quebrava 5 testes e o self-test, sem aparecer no Linux. Corrigido (FIX-008): espelho relativo à raiz + manifesto com espelho explícito. Pesquisada e validada a ideia do usuário de verificação pós-aplicação (outcome-based; agentes mentem sobre o próprio trabalho) → §8 do guia + DEC-016. Avaliada a ideia de arquivo de relatório (recomendado NÃO criar — ver IDEAS › Feedback para o Kit). Kit de contexto atualizado (CLAUDE.md + cabeçalhos de template). v0.5.1, 90 testes. Sessões anteriores:
 **2026-06-12 — F2 polish + sandbox** (DEC-015, FIX-007, GUI colar/copiar-erro). 
 **2026-06-11 — F2 + pesquisa V4A + kit v2.** GUI PySide6 entregue como camada fina sobre a pilha (DEC-013) com testes offscreen; `self-test`; estudo do apply_patch/V4A e concorrentes virou a DEC-014 (erro acionável com dica de whitespace, sem fuzzy silencioso) e o guia v2 autocontido (exemplo embutido, anti-padrões YAML-only, tabela erro→correção). 84 testes, v0.4.0. Sessão anterior:

@@ -201,6 +201,13 @@ def _cmd_self_test(args: argparse.Namespace) -> int:
     with tempfile.TemporaryDirectory(prefix="asu_selftest_") as tmp:
         raiz = Path(tmp) / "demo_project"
         shutil.copytree(demo_proj, raiz)
+        # A demo CRIA src/health.py via create_file. Se ele vazou para o
+        # examples/demo_project do repo numa execução anterior e foi copiado
+        # junto, o create_file/rollback se confundiria (o arquivo "já existia").
+        # Remover garante que o self-test parte de um estado limpo (FIX-009).
+        residual = raiz / "src" / "health.py"
+        if residual.exists():
+            residual.unlink()
 
         report = apply_instruction(instruction, root_path=raiz, color=False)
         if not report.ok:

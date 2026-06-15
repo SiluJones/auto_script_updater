@@ -1,6 +1,13 @@
 # Backups gerados pela ferramenta (DEC-006) — nunca versionar.
 backups/
 
+# Artefatos gerados ao rodar a demo/self-test dentro do repo — nunca versionar.
+# A demo.yaml CRIA estes via create_file; se vazarem para examples/, os testes
+# de GUI/self-test (que copiam demo_project) quebram com "health.py já existe".
+examples/demo_project/src/health.py
+# Sandboxes criadas por `apply --sandbox` (pasta irmã *_sandbox_<timestamp>).
+*_sandbox_*/
+
 # Python
 __pycache__/
 *.py[cod]
