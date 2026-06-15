@@ -1,4 +1,4 @@
-# CONTEXT.md — Atualizador Automático de Scripts
+# CONTEXT.md — Atualizador Automático de Scripts (ASU)
 
 > Arquivo **estável**. O assistente lê no início de cada sessão para se ambientar.
 > Muda pouco: só em alteração estrutural (stack, arquitetura, escopo, nova armadilha descoberta).
@@ -7,129 +7,154 @@
 ---
 
 ## Visão Geral
-Ferramenta desktop em Python que aplica automaticamente modificações a arquivos de projeto (`.py`, `.md`, `.json`, `.txt`) a partir de arquivos de instrução gerados por IA (Claude ou similar). Elimina o trabalho manual de copiar e colar trechos de código entre sessões: ao final de uma sessão de trabalho com IA, o assistente gera um YAML de instrução estruturado; o usuário abre na ferramenta, confere o diff colorido e aplica com um clique. Objetivo: tempo entre "IA gerou a instrução" e "modificações aplicadas no projeto" < 30 segundos, com zero edição manual.
+Ferramenta desktop em Python que aplica modificações a arquivos de projeto a partir de um **arquivo de instrução YAML gerado por IA**. Elimina o copia-e-cola manual de trechos de código entre sessões: ao fim de uma sessão de trabalho com IA, o assistente gera um YAML de instrução estruturado; o usuário valida, confere o diff colorido (dry-run) e aplica — com backup e rollback. O **consumidor real da ferramenta é a própria IA** que gera as instruções (por isso há um "kit de ensino" para ela em `docs/`). Meta: < 30 s do "IA gerou a instrução" ao "modificações aplicadas", com zero edição manual.
+
+Apesar do nome ("Scripts"), a ferramenta modifica QUALQUER arquivo de texto — `.py`, `.json`, `.md`/`.txt` com estratégias dedicadas, e qualquer outra linguagem (`.cs`, `.cpp`, `.java`, `.js/.jsx/.tsx`, `.gd`, `.css`, `.html`, …) via o mecanismo universal de contexto/regex. Binários e UTF-16/32 são rejeitados.
 
 ## Stack Tecnológica
 - **Linguagem:** Python 3.11+
-- **GUI:** PySide6 6.x (binding oficial do Qt 6 — licença LGPL)
-- **Parsing de instrução:** PyYAML + jsonschema
+- **GUI:** PySide6 6.x (binding oficial do Qt 6 — licença LGPL). Instalada via `requirements-gui.txt`.
+- **Parsing de instrução:** PyYAML (com loader estrito anti-duplicata) + jsonschema (Draft 7)
 - **Manipulação Python:** libcst 1.x (Concrete Syntax Tree — preserva comentários e espaçamento)
 - **Manipulação texto/MD/TXT:** `re` + `difflib` (stdlib)
-- **Manipulação JSON:** `json` (stdlib) + navegador de caminho próprio (`a.b[0].c`; jmespath removido no FIX-005)
-- **Testes:** pytest + pytest-qt
-- **Packaging:** PyInstaller (executável `.exe` standalone Windows)
-- **Formato de instrução:** YAML 1.2
+- **Manipulação JSON:** `json` (stdlib) + navegador de caminho próprio (`a.b[0].c`; distingue `null` de ausência — jmespath foi REMOVIDO no FIX-005)
+- **Testes:** pytest + pytest-qt (testes de GUI rodam offscreen via `QT_QPA_PLATFORM=offscreen`)
+- **Lint/format:** ruff + black (linha máx. 100)
+- **Packaging futuro:** PyInstaller (`.exe` standalone Windows) — PLANEJADO, ainda não implementado (ver ROADMAP).
+- **Núcleo enxuto:** apenas 4 dependências fora da stdlib — PyYAML, jsonschema, libcst, colorama. O core não importa Qt (pode virar biblioteca pura — meta de F4).
 
-## Estrutura do Projeto
+## Estrutura do Projeto (real — confirmada via manifest)
 ```
 auto_script_updater/
 ├── src/
+│   ├── __init__.py                    # __version__ (atual: "0.6.0")
+│   ├── __main__.py                    # CLI: validate | apply | self-test | rollback
 │   ├── core/
-│   │   ├── instruction_parser.py      # Carrega e deserializa YAML/JSON de instrução
-│   │   ├── instruction_validator.py   # Valida estrutura contra JSON Schema
-│   │   ├── file_locator.py            # Resolve root_path + relative_path; verifica existência
-│   │   ├── patch_engine.py            # Orquestra modificações; transação; rollback
-│   │   ├── backup_manager.py          # Cria backup timestampado; restaura sob demanda
-│   │   └── diff_renderer.py           # Gera unified diff legível (prévia GUI + output CLI)
+│   │   ├── instruction_parser.py      # load_instruction / load_instruction_from_string; _StrictLoader (rejeita YAML duplicado)
+│   │   ├── instruction_validator.py   # validate() contra JSON Schema + _check_unique_ids
+│   │   ├── file_locator.py            # resolve_path (relative/absolute), ensure_ready, guarda de contenção
+│   │   ├── patch_engine.py            # ORQUESTRADOR: apply_instruction(); transação + rollback; make_sandbox + SandboxError + SANDBOX_IGNORES
+│   │   ├── backup_manager.py          # BackupManager (espelho relativo à raiz — FIX-008), manifest.txt, history.log, rollback_session
+│   │   └── diff_renderer.py           # unified diff colorido (colorama) p/ prévia e output
 │   ├── strategies/
-│   │   ├── base_strategy.py           # ABC: interface apply() (localiza + aplica num passo)
-│   │   ├── python_strategy.py         # Estratégias Python via libcst (CST)
-│   │   ├── text_strategy.py           # Estratégias texto genérico: regex + janela de contexto
-│   │   ├── json_strategy.py           # Estratégias JSON: set/append/delete por caminho pontilhado
-│   │   └── file_strategy.py           # Arquivo inteiro: create_file / replace_file (DEC-008)
+│   │   ├── __init__.py                # REGISTRY das 13 estratégias + get_strategy()
+│   │   ├── base_strategy.py           # BaseStrategy (ABC), StrategyError, get_location()
+│   │   ├── python_strategy.py         # libcst: replace_function / replace_method / replace_class
+│   │   ├── text_strategy.py           # regex/contexto: insert_after/before_pattern, replace_line_pattern, replace_context_block, replace_section; _whitespace_hint (DEC-014)
+│   │   ├── json_strategy.py           # navegador próprio: set/append/delete_json_path; _detect_style (FIX-004); _MISSING (FIX-005)
+│   │   └── file_strategy.py           # create_file / replace_file (DEC-008)
 │   ├── gui/
-│   │   ├── main_window.py             # Janela principal + orquestração de UI
-│   │   ├── file_tree_panel.py         # Árvore de arquivos afetados (QTreeWidget + status)
-│   │   ├── diff_viewer.py             # Diff colorido (QTextEdit + QSyntaxHighlighter)
-│   │   └── root_picker.py             # Seletor de pasta raiz com histórico
-│   ├── schemas/
-│   │   └── instruction_v1.schema.json # JSON Schema — contrato do arquivo de instrução v1.x
-│   └── __main__.py                    # Entry point/CLI: `python -m src {validate|apply|rollback} ...`
+│   │   ├── __init__.py
+│   │   ├── __main__.py                # `python -m src.gui`
+│   │   └── main_window.py            # GUI MONOLÍTICA (uma janela): MainWindow — preview/aplicar/desfazer/colar/copiar-erro/checkbox-sandbox
+│   └── schemas/
+│       └── instruction_v1.schema.json # JSON Schema — contrato do arquivo de instrução (format_version)
 ├── tests/
-│   ├── fixtures/                      # Arquivos de referência para testes
-│   ├── test_strategies.py             # Testes unitários por strategy
-│   ├── test_patch_engine.py           # Testes de integração do engine
-│   └── test_instruction_parser.py     # Testes do parser + validator
-├── backups/                           # Backups automáticos por timestamp (gitignored)
-├── pyproject.toml                     # Config de pytest, ruff e black
-├── requirements.txt                   # Núcleo (sem Qt): PyYAML, jsonschema, libcst, colorama
-├── requirements-gui.txt               # Camada GUI: PySide6
-└── requirements-dev.txt               # GUI + pytest, pytest-qt, ruff, black
+│   ├── test_strategies.py             # unitários por strategy
+│   ├── test_edge_cases.py             # bordas: FIX-001..006, dica de whitespace
+│   ├── test_multilang.py              # C#, C++, Java, JSX, TSX, GDScript via type:text
+│   ├── test_patch_engine.py           # integração: ciclo completo + sandbox + backup_location/history
+│   ├── test_instruction_parser.py     # parser + validator (inclui anti-duplicata)
+│   └── test_gui_smoke.py              # GUI offscreen: preview→aplicar→desfazer, fingerprint, sandbox
+├── docs/
+│   ├── INSTRUCTION_GUIDE.md           # kit de ensino da IA (autocontido): formato, 13 estratégias, 6 regras de ouro, tabela erro→correção, §8 verificação
+│   └── PROMPT_IA.md                   # bloco para colar nas instruções de projetos consumidores
+├── examples/
+│   ├── demo.yaml                      # instrução de demo (CRIA src/health.py via create_file — gitignored, FIX-009)
+│   ├── demo_project/                  # projeto de demo executável (src/calculator.py, config.json, web/app.js, README.md)
+│   └── exemplo_instrucao.yaml
+├── pyproject.toml                     # version, pytest/ruff/black config
+├── requirements.txt / -gui.txt / -dev.txt   # dependências em camadas (núcleo / GUI / dev)
+└── .gitignore                         # ignora backups/, examples/demo_project/src/health.py, *_sandbox_*/
+
+# NÃO versionados no Projeto (vivem no Git): logs/AAAA-MM-DD.md (logs de sessão).
+# Docs de contexto (meta/): CLAUDE, CONTEXT, STATUS, DECISIONS, CHANGELOG, IDEAS, ROADMAP, GLOSSARY, HISTORICO, LOG-TEMPLATE.
 ```
 
+## Ambiente e fluxo de trabalho com o Claude (CRÍTICO para a continuidade)
+- **Usuário em Windows (CMD).** Todos os comandos de terminal devem ser sintaxe CMD: tudo numa linha, `-m` repetido no commit, caminhos com `\`, e mensagens de commit SEM acentos (o CMD corrompe).
+- **Desenvolvimento em container Linux** → o código tem de ser cross-platform. Bugs de Windows (MAX_PATH — FIX-008) podem passar despercebidos no CI Linux; testar caminhos sensíveis com cuidado.
+- **Pasta do projeto no Windows:** `C:\Users\alexk\Arquiteturas\ASU\auto_script_updater`.
+- **Como o usuário sobe o projeto:** ACHATADO via FlatDrop, que gera um `_MANIFEST.md` mapeando nome-plano → caminho-real (arquivos em `/mnt/project/` sem subpastas, com sufixo `__pasta` em colisões). SEMPRE consultar o manifest antes de deduzir nomes/estrutura; entregar pelo nome/caminho REAL.
+- **Onde o código vive no container:** `/home/claude/auto_script_updater/` (árvore íntegra, persiste entre compactações). Entregas vão para `/mnt/user-data/outputs/` (zips versionados `asu_vX.Y.Z.zip`, módulos avulsos em `src_changed/`, docs em `meta/`/`docs/`/`logs/`).
+- **Princípios do trabalho (CLAUDE.md):** entregar arquivos COMPLETOS ao fim da sessão; uma fonte de verdade por dado; turnos densos (custam quota); PT-BR conciso; NÃO regenerar docs no meio da sessão; ir à causa raiz; pesquisar para refinar E refutar; mudança mínima que resolve.
+
 ## Como o Arquivo de Instrução Funciona (CRÍTICO)
-O arquivo de instrução (`.yaml`) é gerado pela IA e consumido pela ferramenta. Hierarquia:
+O arquivo de instrução (`.yaml`; JSON também aceito) é gerado pela IA e consumido pela ferramenta. Hierarquia:
 
 ```
 instrução
-├── cabeçalho: format_version, generated_by, generated_at, description
-├── settings: backup, dry_run, stop_on_error, encoding
+├── cabeçalho: format_version ("1.0"), generated_by?, generated_at?, description
+├── settings?: backup, dry_run, stop_on_error, encoding   (todos opcionais; têm padrões)
 └── files[]
-    ├── id, path_mode ("relative" | "absolute"), caminho
-    ├── type ("python" | "markdown" | "json" | "text")
+    ├── id (único), path_mode ("relative" | "absolute"), relative_path|absolute_path
+    ├── type ("python" | "markdown" | "json" | "text"), language? (informativo)
     └── modifications[]
-        ├── id, description, strategy (nome do algoritmo — fonte única de como ler o location)
-        ├── location (identificador único conforme a strategy, sem número de linha; ausente em create_file/replace_file)
-        └── new_content / content / value (o conteúdo a aplicar)
+        ├── id (único no arquivo), description, strategy (fonte ÚNICA de como ler o location)
+        ├── location (conforme a strategy; SEM número de linha; ausente em create_file/replace_file)
+        └── new_content (substituição) | content (inserção/criação) | value (JSON)
 ```
 
-**Resolução de caminho:**
-- `path_mode: relative` → usuário define pasta raiz na GUI; ferramenta concatena `root_path + relative_path`.
-- `path_mode: absolute` → a IA preencheu o caminho completo; ferramenta usa diretamente.
+**Resolução de caminho:** `relative` → `root_path` (do `--root`/GUI) + `relative_path`; `absolute` → caminho completo já na instrução. Guarda de contenção: no modo relative, o caminho não pode escapar da raiz.
 
-**Localização sem número de linha** (ver DEC-001): modificações são localizadas por identificadores semânticos ou janela de contexto — nunca por número de linha absoluto — para resistir a edições anteriores no mesmo arquivo.
+**Localização sem número de linha (DEC-001):** identificadores semânticos (nome de função, heading, caminho JSON) ou janela de contexto — nunca número de linha — para resistir a edições anteriores no mesmo arquivo.
 
-## Estratégias de Modificação
-| Estratégia | Arquivo-alvo | Como localiza |
-|---|---|---|
-| `replace_function` | Python | Nome da função (libcst — nó FunctionDef) |
-| `replace_method` | Python | Nome da classe + nome do método |
-| `replace_class` | Python | Nome da classe (libcst — nó ClassDef) |
-| `insert_after_pattern` | Qualquer | Regex único + nº de ocorrência |
-| `insert_before_pattern` | Qualquer | Regex único + nº de ocorrência |
-| `replace_context_block` | Qualquer | Janela de contexto: N linhas antes + N depois |
-| `replace_line_pattern` | Qualquer | Regex que casa exatamente a linha alvo |
-| `replace_section` | Markdown | Texto do heading (ex: `## Configuração`) |
-| `set_json_path` | JSON | Caminho pontilhado (ex: `config.database.host`) |
-| `append_json_array` | JSON | Caminho pontilhado do array + valor a inserir |
-| `delete_json_path` | JSON | Caminho pontilhado do nó a remover |
-| `create_file` | Qualquer | Sem localização — cria arquivo novo a partir de `content` (DEC-008) |
-| `replace_file` | Qualquer | Sem localização — substitui todo o conteúdo por `new_content` (DEC-008) |
+## Estratégias de Modificação (13)
+| Estratégia | Alvo | Como localiza | Conteúdo |
+|---|---|---|---|
+| `replace_function` | Python | nome da função (libcst; `class_name?` se aninhada) | `new_content` |
+| `replace_method` | Python | `class_name` (OBRIGATÓRIO) + nome do método | `new_content` |
+| `replace_class` | Python | nome da classe (libcst) | `new_content` |
+| `insert_after_pattern` | Qualquer | regex de linha + `occurrence?` | `content` |
+| `insert_before_pattern` | Qualquer | regex de linha + `occurrence?` | `content` |
+| `replace_line_pattern` | Qualquer | regex que casa a linha + `occurrence?` | `new_content` |
+| `replace_context_block` | Qualquer | âncoras literais `before`/`after` + `occurrence?` | `new_content` (SÓ O MIOLO — âncoras permanecem) |
+| `replace_section` | Markdown | texto do heading (`include_heading?`) | `new_content` |
+| `set_json_path` | JSON | caminho pontilhado (`a.b[0].c`; cria intermediários) | `value` |
+| `append_json_array` | JSON | caminho pontilhado (deve existir) | `value` |
+| `delete_json_path` | JSON | caminho pontilhado (`null` existe e é removível) | — |
+| `create_file` | Qualquer | sem localização — cria arquivo novo | `content` |
+| `replace_file` | Qualquer | sem localização — substitui o arquivo inteiro | `new_content` |
 
-## Convenções de Código
-- **Nomes:** snake_case, inglês (arquivos, funções, variáveis, classes)
-- **Comentários:** PT-BR; toda função pública tem docstring PT-BR (estilo Google)
-- **Commits:** PT-BR, imperativo curto, Conventional Commits (`feat`, `fix`, `docs`, `refactor`, `chore`)
-- **Estilo:** ruff (lint) + black (format); linha máxima 100 caracteres
-- **Tipos:** type hints em toda assinatura de função pública
-- **Testes:** pytest; cobertura mínima do core: 80%
+## Interface (CLI e GUI)
+**CLI:** `python -m src {validate|apply|self-test|rollback}`.
+- `apply INSTRUCAO`: flags `--root`, `--dry-run`, `--no-backup`, `--sandbox`, `--backup-dir PASTA`, `--no-color`, `--yes/-y`.
+- `rollback TIMESTAMP`: flags `--root`, `--backup-dir PASTA`.
+- Fluxo recomendado: `validate` → `apply --dry-run` (revisa diff) → `apply` (confirma s/N, cria backup, imprime `Backup: ...\<TIMESTAMP>` e `Histórico: ...\history.log`) → `rollback <TIMESTAMP>`.
+- `self-test`: aplica a demo embutida num tempdir, confere e reverte (nada do disco é tocado).
 
-## Arquitetura — Pontos-chave
-- Estratégias são intercambiáveis via padrão Strategy (ABC) — ver DEC-002.
-- libcst, não ast stdlib, para toda modificação Python — ver DEC-003.
-- YAML como formato canônico de instrução — ver DEC-004.
-- PySide6 como framework GUI — ver DEC-005.
-- Backup obrigatório antes de qualquer escrita em disco — ver DEC-006.
-- Schema versionado com campo `format_version` — ver DEC-007.
-- Estratégias de arquivo inteiro (`create_file`/`replace_file`) unificam criar-do-zero e patch — ver DEC-008.
-- `strategy` é a fonte única de como interpretar `location` (sem `location.type`); interface da strategy é um `apply()` único — ver DEC-009.
-- Independência de linguagem via janela de contexto/regex; libcst é reforço; `requirements` em camadas (núcleo sem Qt) — ver DEC-010.
+**GUI:** `python -m src.gui` (camada FINA sobre a mesma pilha do CLI — DEC-013). Botões: Pré-visualizar (dry-run; árvore 🟢/🔴/⚪ + diff colorido), Aplicar (backup), Desfazer, Colar instrução (clipboard), Copiar erro para a IA; checkbox "Aplicar em sandbox". Estado entre prévia/aplicação/desfazer protegido (FIX-007: fingerprint SHA-256 + raiz capturada).
+
+## Arquitetura — Pontos-chave (ver DECISIONS para o porquê)
+- Padrão Strategy (ABC) por tipo de arquivo — DEC-002.
+- libcst (não ast) para Python — DEC-003.
+- YAML como formato canônico — DEC-004.
+- PySide6 como GUI — DEC-005.
+- Backup obrigatório + rollback atômico — DEC-006; espelho relativo à raiz — FIX-008; local configurável + history.log — DEC-018.
+- Schema versionado (`format_version`) — DEC-007.
+- `create_file`/`replace_file` unificam criar e patchar — DEC-008.
+- `strategy` é fonte única do `location`; interface `apply()` única — DEC-009.
+- Independência de linguagem via contexto; requirements em camadas — DEC-010.
+- Unicidade implícita de localizadores (ambíguo sem `occurrence` = erro) — DEC-011.
+- Kit de ensino da IA como artefato do produto — DEC-012.
+- GUI fina sobre a pilha; confiança via dry-run — DEC-013.
+- Erro acionável, nunca fuzzy silencioso — DEC-014.
+- Sandbox como cópia irmã (CLI e GUI; lógica no core) — DEC-015 + DEC-019.
+- Verificação pós-aplicação pela IA (outcome-based, lê o disco) — DEC-016.
+- Dois canais de feedback: Kit (no IDEAS) × ASU (DEC/FIX/IDEAS) — DEC-017.
 
 ## Armadilhas Conhecidas
-1. **Localizar por número de linha absoluto** — linhas se deslocam após qualquer inserção/deleção anterior no mesmo arquivo; em instruções com várias modificações, a taxa de falha é alta → usar estratégias semânticas (nome de função, heading, caminho JSON) ou janela de contexto; se inevitável usar posição textual, aplicar modificações do fim para o início do arquivo.
-
-2. **ast stdlib para reescrita Python** — `ast.unparse()` normaliza o código: remove comentários, altera espaçamento, pode trocar aspas simples por duplas → nunca usar ast para escrever de volta em disco; sempre libcst.
-
-3. **Encoding ambíguo no Windows** — arquivos sem BOM podem ser CP-1252 ou UTF-8 → abrir sempre com `encoding="utf-8"` explícito; capturar `UnicodeDecodeError` e tentar `"cp1252"` como fallback; informar o usuário qual encoding foi detectado.
-
-4. **Modificações interdependentes no mesmo arquivo** — uma modificação pode depender de linha inserida pela anterior; aplicar via texto sem reparse pode errar o contexto → o `patch_engine` reparseia (recarrega o conteúdo atual do arquivo ou do CST em memória) após cada modificação do mesmo arquivo antes de aplicar a próxima.
-
-5. **Pattern regex não-único** — se o padrão casa mais de uma vez no arquivo, a modificação pode ocorrer no lugar errado → validar unicidade (para `occurrence: 1`) antes de qualquer escrita; alertar e bloquear se o regex casar ≠ 1 vez quando unicidade é esperada.
-
-6. **Caminhos Windows com barras invertidas no YAML** — `\` em YAML é caractere de escape; caminhos Windows devem usar `\\` ou `/` no arquivo de instrução → documentar isso no prompt padrão que a IA usa para gerar instruções.
+1. **Número de linha como localizador** — linhas se deslocam após inserções/deleções; usar semântico ou janela de contexto (DEC-001).
+2. **ast stdlib para reescrever Python** — `ast.unparse()` remove comentários e normaliza; sempre libcst (DEC-003).
+3. **Encoding ambíguo no Windows** — abrir com `encoding="utf-8"`; BOM UTF-8 preservado; cp1252 como fallback; UTF-16/32 rejeitados (FIX-002).
+4. **Modificações interdependentes no mesmo arquivo** — o engine reaplica em sequência, cada uma vendo o resultado da anterior; prefira independência.
+5. **Pattern/âncora não-único** — bloqueado antes de escrever se casar ≠ 1 vez sem `occurrence` (DEC-011); a falha mais comum de IA é whitespace divergente na âncora — o erro dá dica acionável com a linha exata (DEC-014).
+6. **Caminhos Windows no YAML** — `\` é escape; usar `\\` ou `/`.
+7. **MAX_PATH no Windows (260 chars)** — caminhos sensíveis (backup/sandbox) devem ser curtos/relativos; o backup espelha relativo à raiz (FIX-008). Teste verde no Linux NÃO cobre isso.
+8. **Demo que escreve no próprio repo** — `examples/demo.yaml` cria `src/health.py`; se vazar para o repo versionado, quebra os testes (FIX-009); está no `.gitignore` e é limpo nos testes/self-test.
 
 ## Contexto de Produto
-- **Usuário-alvo:** Desenvolvedor que usa IA de forma intensiva; trabalha em Windows; cansa de copiar manualmente sugestões da IA para o projeto entre sessões.
-- **Dor que resolve:** Risco de erro ao copiar manualmente + tempo perdido com copiar/colar trechos longos em múltiplos arquivos.
-- **O que é sucesso:** IA gera instrução → ferramenta aplica → zero edição manual; < 30 s do início ao fim.
-- **O que o projeto deliberadamente NÃO é:** editor de código completo, plugin de IDE, ferramenta de merge/conflito, sistema de controle de versão, agente com acesso direto à IA.
+- **Usuário-alvo:** desenvolvedor que usa IA intensivamente, em Windows, e cansa de copiar manualmente sugestões da IA entre sessões.
+- **Dor que resolve:** risco de erro + tempo perdido com copia-e-cola de trechos em vários arquivos.
+- **Sucesso:** IA gera instrução → ferramenta aplica → zero edição manual, < 30 s.
+- **O que o ASU deliberadamente NÃO é:** editor de código, plugin de IDE, ferramenta de merge/conflito, sistema de controle de versão, nem agente com acesso direto à API da IA (consome instruções pré-geradas).

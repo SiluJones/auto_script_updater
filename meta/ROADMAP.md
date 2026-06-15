@@ -46,26 +46,32 @@
 
 - [x] `src/gui/main_window.py` — janela principal, barra de menu, barra de status.
 - [x] Árvore de arquivos afetados com ícone de status por arquivo (🟢/🔴/⚪) e por modificação (✓/✗) — integrada na main_window; o 🟡 aguarda o canal de warnings (IDEAS).
-- [ ] `src/gui/diff_viewer.py` — visualizador de diff com syntax highlight (QSyntaxHighlighter; adições verde, remoções vermelho).
-- [ ] `src/gui/root_picker.py` — seletor de pasta raiz com histórico dos últimos 5 usos.
+- [~] Diff colorido por arquivo integrado na main_window (HTML, verde/vermelho); syntax highlight por linguagem ainda pendente.
+- [~] Seletor de raiz lembra o ÚLTIMO uso (QSettings); histórico dos últimos 5 ainda pendente.
 - [ ] Barra de progresso durante aplicação de instruções com muitos arquivos.
 - [x] Modo dry-run na GUI — o botão "Pré-visualizar" É um dry-run (sempre antes de aplicar; desenho mais seguro que checkbox).
+- [x] Botão "Copiar erro para a IA" — copia erros + ref. ao guia para colar na IA geradora (loop de autocorreção).
+- [x] Checkbox "Aplicar em sandbox (cópia)" — paridade com `--sandbox` do CLI (DEC-019).
+- [x] Proteção de estado entre prévia/aplicação/desfazer (fingerprint SHA-256 + raiz capturada — FIX-007).
 - [~] Botão "Desfazer última aplicação" entregue (rollback do timestamp da sessão); seleção de timestamps antigos pendente.
 - [ ] Indicador de confiança por modificação (🟢 único / 🟡 ambíguo / 🔴 não encontrado).
 - [ ] Suporte a tema claro/escuro seguindo a preferência do sistema (Qt color scheme).
-- [ ] Botão "Colar instrução" — lê YAML da área de transferência.
+- [x] Botão "Colar instrução" — lê YAML da área de transferência (sem salvar arquivo).
 
 ---
 
-## 🔵 F3 — Produtividade e Polimento *(futura)*
+## 🟡 F3 — Produtividade e Polimento *(parcialmente entregue — itens avulsos saíram junto da F2)*
 **Objetivo:** Recursos que completam o fluxo IA→aplicação sem fricção e tornam a ferramenta "produto acabado".
 **Critério de conclusão:** Fluxo completo sem consultar documentação; ferramenta empacotada como `.exe` standalone.
 
+- [x] `self-test` (CLI) — valida a instalação aplicando a demo embutida em tempdir.
 - [ ] Painel "Gerador de prompt" — prompt padrão para a IA com botão "Copiar".
 - [ ] Histórico de instruções aplicadas (`applied_instructions.json`) com visualizador.
 - [ ] Checksum SHA-256 dos arquivos antes/depois registrado no log.
 - [ ] Modo comparação acumulada pós-aplicação (diff de todos os arquivos numa tela).
-- [ ] Limpeza automática de backups antigos (política configurável: manter últimos N ou últimos X dias).
+- [ ] Gerador de `.bat` por projeto (dry-run + pausa de confirmação; e um `.bat` que só abre a GUI) — ver IDEAS, com ressalva de segurança.
+- [ ] Botão/flag para copiar a SAÍDA completa (não só erro), inclusive em sucesso — ver IDEAS.
+- [~] Backup configurável: `--backup-dir` (fora do projeto) e `history.log` consolidado ENTREGUES (DEC-018); limpeza automática de backups antigos (manter últimos N/X dias) ainda PENDENTE.
 - [ ] Packaging PyInstaller como `.exe` standalone Windows (UPX para compressão).
 - [ ] README de usuário final com capturas de tela e guia de início rápido.
 

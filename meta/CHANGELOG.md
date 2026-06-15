@@ -9,6 +9,21 @@
 
 ---
 
+## [0.6.0] — 2026-06-15
+### Adicionado
+- **`--backup-dir PASTA` (apply e rollback) — DEC-018:** permite criar a pasta `backups/` FORA do projeto (padrão segue sendo a raiz do projeto). Mantém a árvore do projeto 100% limpa. O `rollback` aceita o mesmo `--backup-dir` (com `--root` como fallback) para localizar a pasta quando ela está fora.
+- **`backups/history.log` consolidado — DEC-018:** arquivo append-only com uma linha por aplicação (`timestamp` + nº de arquivos + descrição da instrução), para ver o histórico sem abrir cada pasta de timestamp. O CLI imprime o caminho do history após aplicar.
+- **Checkbox "Aplicar em sandbox (cópia)" na GUI — DEC-019:** paridade com o `--sandbox` do CLI. Aplica numa cópia irmã; o original não é tocado; o status bar mostra o caminho da sandbox.
+
+### Refatorado
+- **Sandbox movido para o core (`patch_engine.make_sandbox` + `SandboxError`) — DEC-019:** a lógica saiu de `__main__.py` (que usava `print`/`SystemExit`) para o core, sinalizando erro por exceção. CLI e GUI agora compartilham uma única implementação (cumpre DEC-013, GUI fina).
+
+### Qualidade
+- Testes: 90 → **93** (2 de backup_location/history + 1 de sandbox na GUI); ruff/black limpos; versão `0.6.0`.
+
+---
+
+
 ## [0.5.2] — 2026-06-14
 ### Corrigido
 - **FIX-009 — artefato da demo (`health.py`) vazou para o repo e quebrava 4 testes + self-test no Windows.** A `demo.yaml` cria `examples/demo_project/src/health.py` via `create_file`; numa execução anterior (provavelmente antes do FIX-008, quando o rollback no Windows não removia o criado) o arquivo ficou como resíduo e foi versionado. Os testes/self-test copiam `demo_project` e encontravam o `health.py` já presente, quebrando o `assert "não escreveu nada"`. **Não foi erro de processo do usuário — os arquivos estavam nos lugares certos.** Correção em 3 camadas: `.gitignore` ignora o artefato e `*_sandbox_*/`; a fixture de teste e o self-test limpam o que a demo gera após copiar; resíduo removido do pacote.

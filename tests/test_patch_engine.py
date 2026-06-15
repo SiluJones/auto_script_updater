@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -315,3 +316,59 @@ def test_cli_sandbox_rejects_absolute_paths(tmp_path, capsys):
     assert exc.value.code == 2
     assert "absolute" in capsys.readouterr().err
     assert alvo.read_text(encoding="utf-8") == "x"  # intocado
+
+
+# ─────────────── backup_location + history.log (v0.6.0) ───────────────
+
+
+def _txt_file(rel, mods):
+    return {
+        "id": rel,
+        "path_mode": "relative",
+        "relative_path": rel,
+        "type": "text",
+        "modifications": mods,
+    }
+
+
+def _replace_file_mod(new_content):
+    return [
+        {"id": "m1", "description": "d", "strategy": "replace_file", "new_content": new_content}
+    ]
+
+
+def test_backup_location_keeps_project_clean(tmp_path):
+    """--backup-dir cria backups/ fora do projeto; a arvore do projeto fica limpa."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
+    fora = tmp_path / "fora"
+    fora.mkdir()
+    instr = _instr([_txt_file("f.txt", _replace_file_mod("novo\n"))])
+
+    report = apply_instruction(instr, root_path=proj, backup_location=fora, color=False)
+    assert report.ok
+    assert not (proj / "backups").exists()  # projeto limpo
+    assert (fora / "backups").exists()  # backup foi para fora
+    ts = Path(report.backup_dir).name
+    rollback_session(fora, ts)
+    assert (proj / "f.txt").read_text(encoding="utf-8") == "antigo\n"
+
+
+def test_history_log_accumulates(tmp_path):
+    """Cada aplicacao acrescenta uma linha a backups/history.log."""
+    import time
+
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "f.txt").write_text("v0\n", encoding="utf-8")
+
+    for i in range(1, 3):
+        instr = _instr([_txt_file("f.txt", _replace_file_mod(f"v{i}\n"))])
+        instr["description"] = f"mudanca {i}"
+        time.sleep(1.05)  # timestamps distintos (pasta por segundo)
+        apply_instruction(instr, root_path=proj, color=False)
+
+    history = (proj / "backups" / "history.log").read_text(encoding="utf-8")
+    assert history.count("\n") == 2
+    assert "mudanca 1" in history and "mudanca 2" in history

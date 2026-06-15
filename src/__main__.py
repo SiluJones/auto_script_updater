@@ -82,50 +82,16 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 
 # Pastas ignoradas ao duplicar a raiz para a sandbox (pesadas/geradas).
-_SANDBOX_IGNORES = (
-    ".git",
-    "__pycache__",
-    ".venv",
-    "venv",
-    "env",
-    "node_modules",
-    "backups",
-    ".pytest_cache",
-    ".ruff_cache",
-    ".mypy_cache",
-    "dist",
-    "build",
-    ".idea",
-    ".vscode",
-)
-
-
+# Sandbox vive no core (reutilizável por CLI e GUI); aqui só adaptamos a borda.
 def _make_sandbox(root: Path, instruction: dict) -> Path:
-    """Duplica a raiz numa pasta irmã ``<nome>_sandbox_<ts>`` e a devolve.
+    """Wrapper de CLI sobre ``patch_engine.make_sandbox`` (erro → stderr + exit 2)."""
+    from .core.patch_engine import SandboxError, make_sandbox
 
-    Modo seguro materializado (ideia do usuário, ver README): a instrução é
-    aplicada na CÓPIA; o projeto real não é tocado. Instruções com
-    ``path_mode=absolute`` são rejeitadas — um caminho absoluto escaparia da
-    sandbox por definição.
-    """
-    import shutil
-    from datetime import datetime
-
-    absolutos = [
-        f.get("id", "?") for f in instruction.get("files", []) if f.get("path_mode") == "absolute"
-    ]
-    if absolutos:
-        print(
-            "--sandbox não suporta instruções com path_mode=absolute "
-            f"(arquivos: {', '.join(absolutos)}) — caminhos absolutos escapariam da cópia.",
-            file=sys.stderr,
-        )
-        raise SystemExit(2)
-
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    destino = root.parent / f"{root.name}_sandbox_{ts}"
-    shutil.copytree(root, destino, ignore=shutil.ignore_patterns(*_SANDBOX_IGNORES))
-    return destino
+    try:
+        return make_sandbox(root, instruction)
+    except SandboxError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(2) from exc
 
 
 def _cmd_apply(args: argparse.Namespace) -> int:
@@ -167,9 +133,12 @@ def _cmd_apply(args: argparse.Namespace) -> int:
         root_path=args.root,
         dry_run=args.dry_run,
         backup=False if args.no_backup else None,
+        backup_location=getattr(args, "backup_dir", None),
         color=color,
     )
     _print_report(report)
+    if report.backup_dir and not args.dry_run:
+        print(f"Histórico: {Path(report.backup_dir).parent / 'history.log'}")
     if getattr(args, "sandbox", False) and not args.dry_run:
         print(f"\nSandbox: {args.root}")
         print("Revise o resultado, copie o que aprovar para o projeto real e apague a pasta.")
@@ -245,9 +214,11 @@ def _cmd_self_test(args: argparse.Namespace) -> int:
 
 
 def _cmd_rollback(args: argparse.Namespace) -> int:
-    root = args.root or str(Path.cwd())
+    # A pasta backups/ pode ter sido criada fora do projeto (apply --backup-dir).
+    # Prioriza --backup-dir; senão usa --root; senão o diretório atual.
+    base = getattr(args, "backup_dir", None) or args.root or str(Path.cwd())
     try:
-        revertidos = rollback_session(root, args.timestamp)
+        revertidos = rollback_session(base, args.timestamp)
     except FileNotFoundError as exc:
         print(str(exc), file=sys.stderr)
         return 2
@@ -279,6 +250,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-backup", action="store_true", help="Não criar backup (não recomendado)."
     )
     p_app.add_argument(
+        "--backup-dir",
+        metavar="PASTA",
+        help="Onde criar a pasta backups/ (padrão: a raiz do projeto). Útil para "
+        "manter o backup fora do projeto.",
+    )
+    p_app.add_argument(
         "--sandbox",
         action="store_true",
         help="Aplica numa CÓPIA da raiz (pasta irmã *_sandbox_<ts>); o original não é tocado.",
@@ -295,6 +272,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_rb = sub.add_parser("rollback", help="Desfaz uma aplicação a partir do timestamp do backup.")
     p_rb.add_argument("timestamp", help="Timestamp da sessão (ex.: 20260607_231500).")
     p_rb.add_argument("--root", help="Pasta raiz onde está a pasta backups/.")
+    p_rb.add_argument(
+        "--backup-dir",
+        metavar="PASTA",
+        help="Pasta que contém backups/ (use a mesma de --backup-dir do apply, se usou).",
+    )
     p_rb.set_defaults(func=_cmd_rollback)
 
     return parser

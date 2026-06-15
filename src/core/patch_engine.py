@@ -22,6 +22,56 @@ from . import diff_renderer
 from .backup_manager import BackupManager
 from .file_locator import FileLocatorError, ensure_ready, resolve_path
 
+# Pastas ignoradas ao duplicar a raiz para a sandbox (pesadas/geradas).
+SANDBOX_IGNORES = (
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "env",
+    "node_modules",
+    "backups",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    "dist",
+    "build",
+    ".idea",
+    ".vscode",
+)
+
+
+class SandboxError(Exception):
+    """Sandbox não pôde ser criada (ex.: instrução com caminho absoluto)."""
+
+
+def make_sandbox(root: Path, instruction: Mapping[str, Any]) -> Path:
+    """Duplica ``root`` numa pasta irmã ``<nome>_sandbox_<ts>`` e a devolve.
+
+    Modo seguro (ideia do usuário): a instrução é aplicada na CÓPIA; o projeto
+    real não é tocado. Instruções com ``path_mode=absolute`` são rejeitadas (um
+    caminho absoluto escaparia da cópia). Diferente da camada CLI, aqui sinaliza
+    erro por exceção (``SandboxError``) em vez de encerrar o processo — assim a
+    GUI também pode usar.
+    """
+    import shutil
+    from datetime import datetime
+
+    absolutos = [
+        f.get("id", "?") for f in instruction.get("files", []) if f.get("path_mode") == "absolute"
+    ]
+    if absolutos:
+        raise SandboxError(
+            "O modo sandbox não suporta instruções com path_mode=absolute "
+            f"(arquivos: {', '.join(absolutos)}) — caminhos absolutos escapariam da cópia."
+        )
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    destino = Path(root).parent / f"{Path(root).name}_sandbox_{ts}"
+    shutil.copytree(root, destino, ignore=shutil.ignore_patterns(*SANDBOX_IGNORES))
+    return destino
+
+
 # Padrões dos settings (o schema documenta os mesmos defaults, mas jsonschema
 # não os injeta — aplicamos aqui).
 _DEFAULTS = {"backup": True, "dry_run": False, "stop_on_error": True, "encoding": "utf-8"}
@@ -156,12 +206,18 @@ def apply_instruction(
     root_path: str | Path | None = None,
     dry_run: bool | None = None,
     backup: bool | None = None,
+    backup_location: str | Path | None = None,
     stop_on_error: bool | None = None,
     color: bool = True,
 ) -> ApplyReport:
     """Aplica a instrução e retorna um :class:`ApplyReport`.
 
     A instrução deve ter passado por ``instruction_validator.validate`` antes.
+
+    Args:
+        backup_location: onde criar a pasta ``backups/``. Por padrão é a raiz do
+            projeto (``root_path``). O usuário pode apontar para fora do projeto
+            (ex.: uma pasta irmã), mantendo a árvore do projeto limpa.
     """
     settings = _effective_settings(
         instruction,
@@ -172,10 +228,13 @@ def apply_instruction(
     stop = bool(settings["stop_on_error"])
     default_encoding = settings["encoding"]
 
-    backup_root = Path(root_path) if root_path is not None else Path.cwd()
-    # A raiz encurta os espelhos de backup (caminhos relativos) — evita estourar
-    # o MAX_PATH do Windows ao aninhar caminhos absolutos sob backups/ (FIX-008).
-    backup_mgr = BackupManager(backup_root, root=backup_root) if use_backup else None
+    project_root = Path(root_path) if root_path is not None else Path.cwd()
+    backup_root = Path(backup_location) if backup_location is not None else project_root
+    # A raiz do PROJETO encurta os espelhos (caminhos relativos) — evita estourar
+    # o MAX_PATH do Windows (FIX-008). O LOCAL do backup pode ser outro (o usuário
+    # pode querer a pasta backups/ fora do projeto), por isso são parâmetros
+    # distintos: backup_root = onde criar backups/; root = base dos caminhos.
+    backup_mgr = BackupManager(backup_root, root=project_root) if use_backup else None
 
     report = ApplyReport(ok=True, dry_run=is_dry)
     wrote_anything = False
@@ -291,6 +350,7 @@ def apply_instruction(
     # 6) Manifesto do backup (se houve escrita real).
     if backup_mgr is not None and wrote_anything:
         backup_mgr.write_manifest()
+        backup_mgr.append_history(str(instruction.get("description", "")))
         report.backup_dir = str(backup_mgr.session_dir)
 
     return report

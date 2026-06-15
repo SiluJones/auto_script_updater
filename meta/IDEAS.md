@@ -8,6 +8,28 @@
 
 ## 💡 Ideias Ativas — Usuário
 
+### 2026-06-15 — Subir o PROMPT_IA.md ao projeto e referenciá-lo no CLAUDE.md — ACEITA (a documentar)
+Em vez de colar o conteúdo do bloco de prompt em toda conversa, subir o `PROMPT_IA.md` aos arquivos do projeto consumidor e, no CLAUDE.md/instruções desse projeto, mandar a IA "dar uma olhada no PROMPT_IA.md (e no INSTRUCTION_GUIDE.md) para seguir o processo". Assim qualquer atualização é só trocar o arquivo, sem o usuário relembrar nada. É mais prático e recomendado. Falta documentar isso no GUIA/README (Backlog 0.6.0).
+
+### 2026-06-15 — Geração de .bat para automação por projeto — EM AVALIAÇÃO (com ressalva de segurança)
+O usuário quer .bat por pasta de projeto (raiz fixa) para acelerar: copiar o .yaml gerado para uma pasta, rodar o .bat, e ele já faz dry-run + aplicar com a raiz e instrução pré-configuradas. Também um .bat que só "ativa" a GUI (sem precisar abrir console, rodar venv etc.) e, talvez, um BOTÃO na GUI que gera o .bat após definir raiz+instrução (gerar ao lado do .yaml). PESQUISA (AI-patch safety): auto-aplicar sem revisão é arriscado — 43% dos patches passam no teste primário mas quebram em casos adversos; tamanho do changeset prediz instabilidade. RECOMENDAÇÃO: o .bat de aplicação deve fazer dry-run e PAUSAR para confirmação humana (nunca aplicar direto e silencioso); o .bat de "abrir GUI/ativar venv" é seguro e ótimo. Um gerador de .bat (CLI ou botão na GUI) seguindo um template seguro é viável. Decisão de design e template ficam para implementar.
+
+### 2026-06-15 — Local do backup junto da instrução + nome com prefixo da raiz — PARCIAL (DEC-018)
+O usuário deixa a instrução numa pasta antes da raiz do projeto e gostaria que o backup caísse ali também (fora do projeto), e que a pasta de backup tivesse o nome da raiz como prefixo + algo que a "empurre para o fundo" da listagem (ele brincou com "ZZbackup"). IMPLEMENTADO em 0.6.0: `--backup-dir` resolve o "backup fora do projeto" (pode apontar para a pasta da instrução). NÃO implementado (adiado, ver DEC-018): prefixo do nome da raiz na pasta de backup — alongaria caminhos (risco MAX_PATH no Windows, FIX-008) sem ganho enquanto cada projeto tem sua própria `backups/`; só faria sentido se vários projetos compartilhassem UMA pasta de backup. Sobre "empurrar para o fundo": ponto-prefixo (`.backups`) some no Windows e atrapalha; um prefixo tipo `zz_` é factível se o usuário quiser priorizar ordenação visual sobre limpeza — manter em aberto. Nota: dentro de uma `backups/`, a ordenação por timestamp já é cronológica natural.
+
+### 2026-06-15 — Log do rollback/aplicação na pasta da instrução; um arquivo único com todos os timestamps — PARCIAL (DEC-018)
+Pedido de um log que caia onde a instrução está, e de um ÚNICO arquivo que incremente com cada timestamp e o que foi feito (em vez de abrir cada pasta de backup). IMPLEMENTADO em 0.6.0: `backups/history.log` é esse arquivo único append-only (timestamp + nº de arquivos + descrição). Combinado com `--backup-dir`, o history fica onde o usuário quiser (inclusive na pasta da instrução). Falta (se o usuário quiser): registrar também os ROLLBACKS no history (hoje só registra aplicações) — pequeno e natural; anotar como refinamento.
+
+### 2026-06-15 — Opção de não gerar / excluir o backup depois — JÁ EXISTE (parcial) + a avaliar
+"Seria interessante uma opção para não gerar ou excluir o backup depois?" O `--no-backup` já existe (não gera). FALTA: um comando/flag para LIMPAR backups antigos (ex.: `asu clean-backups --older-than N` ou manter só os últimos K). Útil para não acumular. Avaliar como feature de manutenção.
+
+### 2026-06-15 — Copiar console/saída (não só erro) na GUI, e em massa — EM AVALIAÇÃO
+Hoje a GUI tem "Copiar erro para a IA" (só em falha). O usuário quer um "Copiar console/saída" independente de erro (também útil para sucesso) e que funcione "em massa" quando a instrução tem vários blocos/arquivos. Viável: um botão "Copiar saída" que serializa o relatório inteiro (todos os arquivos/modificações, ok e falha) para a área de transferência. Alinha com o "trilho auditável" da pesquisa. Baixo risco.
+
+### 2026-06-15 — Aplicar/desfazer/copiar EM MASSA e SELEÇÃO de blocos na GUI — EM AVALIAÇÃO (possível conflito com o objetivo)
+O usuário pergunta se a GUI consegue dry-run/aplicar/desfazer/copiar em massa (instrução com vários scripts) e se daria para SELECIONAR só alguns para aplicar/desfazer. PESQUISA: seleção parcial é padrão consagrado (`git add -p`/`--patch`, seleção por hunk). PORÉM o próprio usuário levantou a ressalva certa: isso pode ir de encontro ao objetivo do ASU — a instrução é uma unidade atômica ("tudo ou nada", DEC pré-existentes); se o processo de geração não erra, selecionar específicos é desnecessário. POSIÇÃO: "aplicar em massa" já É o comportamento (uma instrução com N arquivos aplica os N de uma vez, com rollback atômico). "Selecionar um subconjunto" é o ponto sensível — adiar até o uso real mostrar necessidade; se vier, fazer como OPT-IN explícito que NÃO quebra a atomicidade padrão (ex.: gerar uma sub-instrução com os selecionados, mantendo o backup/rollback do subconjunto). O usuário mesmo disse que o que importa ele já descobriu e vai testar para ver se todas as conversas conseguem usar — então prioridade é o teste de campo, não a seleção.
+
+
 ### 2026-06-13 — Verificação pós-aplicação pela IA (na sessão seguinte) — ACEITA, ver DEC-016
 Depois que o usuário aplica uma instrução ASU e reabre o projeto, a IA deve conferir cada arquivo tocado para ver se ficou como esperado, mesmo sem queixa — ajuda a achar discrepâncias nos primeiros pilotos. **Pesquisada e validada** (agentes de código emitem "linguagem de conclusão" independentemente do estado real; verificação confiável é *outcome-based*, lendo o disco, não o relato — DEV/CrisisCore; ReVeal; TDAD −70% regressões). Implementada como §8 do INSTRUCTION_GUIDE + item no PROMPT_IA. Ressalva aplicada: verificar LENDO o arquivo, nunca perguntando "deu certo?".
 
@@ -111,10 +133,17 @@ FIX-002 rejeita UTF-16/32 com erro claro pedindo conversão. Se aparecerem proje
 - **GUI mínima viável (F2)** — entregue em 2026-06-11 (DEC-013): preview/aplicar/desfazer com indicadores derivados do dry-run.
 
 ---
+- **Local do backup configurável (`--backup-dir`)** — entregue em 2026-06-15 (DEC-018): cria `backups/` fora do projeto, mantendo a árvore limpa.
+- **Log consolidado de aplicações (`backups/history.log`)** — entregue em 2026-06-15 (DEC-018): um arquivo append-only com timestamp + nº de arquivos + descrição.
+- **Checkbox de sandbox na GUI** — entregue em 2026-06-15 (DEC-019): paridade com `--sandbox` do CLI; `make_sandbox` migrado para o core.
 
 ## 📮 Feedback para o Kit
 
 > Material que volta para evoluir o Kit de Contexto — o que ESTE projeto observou sobre o próprio kit.
+
+### 2026-06-15 — Esclarecimento: feedback do ASU vindo de OUTROS projetos que o usam (≠ feedback do Kit)
+O usuário esclareceu o que quis dizer com "feedback sobre o ASU": é o caso de OUTROS projetos que usam o ASU terem feedback (bugs, sugestões) para melhorar a FERRAMENTA. Como tratar: esse feedback deve ser canalizado de volta a ESTE projeto (o repo do ASU) — vira FIX/DEC/IDEA aqui, conforme a natureza. Mecanismo prático sugerido: quando uma IA num projeto consumidor (seguindo o INSTRUCTION_GUIDE) detectar uma limitação ou bug do ASU durante o uso, ela deve registrar isso de forma que o usuário traga ao repo do ASU (ex.: uma nota no fim da resposta "isto parece limitação do ASU: X"). NÃO é "Feedback para o Kit" (que é sobre o meta-sistema de contexto); é feedback de PRODUTO do ASU, vindo de fora. Isto reforça a DEC-017 com um terceiro vetor: feedback do ASU pode nascer interno (esta conversa) OU externo (projetos consumidores) — ambos terminam como DEC/FIX/IDEA no repo do ASU. Possível item futuro: uma seção no INSTRUCTION_GUIDE orientando a IA consumidora a sinalizar limitações do ASU.
+
 
 ### 2026-06-14 — Distinção de canais: feedback do Kit ≠ feedback do produto (DEC-017)
 Esclarecido a pedido do usuário: esta seção «Feedback para o Kit» é SÓ para o meta-sistema (princípios do CLAUDE.md, templates, regras, gatilhos do Kit de Contexto). Feedback sobre o ASU (a ferramenta deste projeto) NÃO entra aqui — flui pelos documentos normais do projeto: bug → FIX no DECISIONS; decisão → DEC; ideia → seções de IDEAS; estado → STATUS. Motivo: o ASU já é o objeto do projeto (tem destinos próprios); o Kit é externo e, sem seção dedicada, seu aprendizado se perderia. Regra prática ao capturar: "isto é sobre a FERRAMENTA ou sobre o SISTEMA QUE ORGANIZA O PROJETO?".

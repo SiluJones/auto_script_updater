@@ -524,3 +524,40 @@ Ou seja: o ASU não precisa (nem deve) de um canal de "feedback" paralelo — el
 
 ### Consequência / regra prática
 Ao capturar um feedback, perguntar: "isto é sobre a FERRAMENTA (ASU) ou sobre o SISTEMA QUE ORGANIZA O PROJETO (Kit)?". ASU → DEC/FIX/IDEAS/STATUS normais. Kit → «Feedback para o Kit» no IDEAS. Isso evita tanto a duplicação quanto a perda de aprendizado de meta-nível. (Decorre da regra de higiene "uma fonte de verdade por dado".)
+
+---
+
+## DEC-018 — Local do backup configurável (`--backup-dir`) e log consolidado (`history.log`)
+**Data:** 2026-06-15 · **Status:** aceita · **Origem:** ideias do usuário (ideia-260614)
+
+### Contexto
+Duas dores do usuário com o backup: (1) a pasta `backups/` nascia DENTRO do projeto, poluindo a árvore versionada; ele preferia deixá-la numa pasta-irmã, fora do projeto; (2) para saber o que cada aplicação fez, era preciso abrir cada pasta de timestamp e ler o manifesto — ele queria um arquivo ÚNICO que crescesse com o histórico.
+
+### Decisão
+1. **`--backup-dir PASTA`** no `apply` (e no `rollback`): define onde criar a pasta `backups/`. Padrão = raiz do projeto (comportamento anterior preservado). No engine, isso virou o parâmetro `backup_location` de `apply_instruction`, distinto de `root_path`: `root_path` continua sendo a base dos caminhos relativos (e o que encurta o espelho — FIX-008), enquanto `backup_location` é só onde a pasta `backups/` mora. O `rollback` ganhou `--backup-dir` (com `--root` como fallback) para achar a pasta quando ela está fora do projeto.
+2. **`backups/history.log`**: um arquivo append-only que ganha uma linha por aplicação (`<timestamp>\t<n> modificado(s), <n> criado(s)>  <descrição da instrução>`). É complementar ao manifesto por sessão (que continua sendo a fonte para o rollback) — o history é só leitura humana cronológica. Implementado como `BackupManager.append_history()`, chamado pelo `patch_engine` ao finalizar uma aplicação real. O CLI imprime o caminho do history após aplicar.
+
+### Alternativas consideradas
+- **Mover o backup para fora por padrão** — quebraria projetos existentes e a expectativa de "o backup fica junto"; melhor deixar opcional com padrão atual → adotado opcional.
+- **Só o manifesto por sessão (status quo)** — não atende à leitura cronológica rápida; o history não substitui o manifesto, soma a ele → adotados os dois.
+- **Prefixo do nome da raiz na pasta de backup** (também pedido) — avaliado mas adiado: a pasta de sessão (`backups/<timestamp>`) já é inequívoca dentro de um projeto, e prefixar o nome da raiz alongaria caminhos (risco no Windows, ligado ao FIX-008) sem ganho real enquanto cada projeto tem sua própria pasta `backups/`. Registrado em IDEAS como ideia condicional (só faria sentido se vários projetos compartilhassem UMA pasta de backup).
+
+### Consequências
+- Projeto pode ficar 100% limpo de artefatos da ferramenta (`--backup-dir` fora + o `.gitignore` do FIX-009).
+- O `history.log` dá uma trilha de auditoria barata, alinhada à pesquisa de "trilho auditável" (sem virar 4ª fonte de verdade — é derivado, não autoritativo).
+
+---
+
+## DEC-019 — Sandbox movido para o core; checkbox de sandbox na GUI (paridade CLI↔GUI)
+**Data:** 2026-06-15 · **Status:** aceita · **Origem:** observação do usuário ("no GUI não vi o sandbox")
+
+### Contexto
+O `--sandbox` (DEC-015) só existia no CLI; sua lógica (`_make_sandbox`) vivia em `src/__main__.py` e usava `print`/`SystemExit` — inadequado para a GUI. O usuário notou a falta de paridade. Duplicar a lógica na GUI violaria a DEC-013 (GUI fina, sem regra de negócio própria).
+
+### Decisão
+Mover a lógica de sandbox para o core (`patch_engine.make_sandbox` + `SANDBOX_IGNORES` + exceção `SandboxError`), sinalizando erro por EXCEÇÃO em vez de encerrar o processo. O CLI passou a ser um wrapper fino (`_make_sandbox` captura `SandboxError` → stderr + exit 2, preservando o comportamento de linha de comando). A GUI ganhou o checkbox **"Aplicar em sandbox (cópia)"**: quando marcado, o `apply_changes` chama `make_sandbox`, aplica na cópia e reporta o caminho da sandbox no status bar (original intocado). Assim, uma única implementação serve as duas interfaces (cumpre DEC-013).
+
+### Consequências
+- Paridade: o modo seguro agora está nas duas interfaces.
+- `make_sandbox` testável isoladamente e reutilizável (ex.: futura automação/.bat poderia chamá-lo).
+- Lição reforçada: lógica compartilhável mora no core; as bordas (CLI/GUI) só adaptam entrada/saída.

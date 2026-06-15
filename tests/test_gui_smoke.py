@@ -209,3 +209,19 @@ def test_gui_copy_errors_for_ai(app, demo_root, tmp_path):
     win.copy_errors_for_ai()
     copiado = QApplication.clipboard().text()
     assert "NAO_EXISTE" in copiado and "INSTRUCTION_GUIDE" in copiado and "§6" in copiado
+
+
+def test_gui_sandbox_checkbox_applies_on_copy(app, demo_root):
+    """Checkbox de sandbox: aplica numa cópia irmã; o demo_root original fica intocado."""
+    win = MainWindow()
+    win.root_edit.setText(str(demo_root))
+    win.instr_edit.setText(str(_REPO / "examples" / "demo.yaml"))
+    win.chk_sandbox.setChecked(True)
+    win.preview()
+    win.apply_changes(confirm=False)
+    # original intacto (health.py NÃO criado nele)
+    assert not (demo_root / "src" / "health.py").exists()
+    # a cópia irmã recebeu a mudança
+    irmas = list(demo_root.parent.glob(f"{demo_root.name}_sandbox_*"))
+    assert len(irmas) == 1
+    assert (irmas[0] / "src" / "health.py").exists()

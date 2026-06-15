@@ -67,9 +67,19 @@
 
 - **`instruction_v1.schema.json`** — JSON Schema (rascunho 7) que define a estrutura obrigatória e opcional do arquivo de instrução v1.x. Fonte de verdade do contrato entre a IA geradora e a ferramenta.
 
-- **`backups/<YYYYMMDD_HHMMSS>/`** — Diretório criado pelo `backup_manager` antes de cada aplicação. Contém cópia dos arquivos afetados com estrutura de pastas preservada.
+- **`backups/<YYYYMMDD_HHMMSS>/`** — Diretório criado pelo `backup_manager` antes de cada aplicação. Contém cópia dos arquivos afetados com estrutura de pastas preservada **relativa à raiz** (FIX-008) + um `manifest.txt`.
 
-- **`applied_instructions.json`** — (F3) Log de auditoria de instruções aplicadas: caminho, data/hora, arquivos afetados, resultado.
+- **`manifest.txt`** — Arquivo dentro de cada pasta de backup, formato `estado<TAB>caminho_original<TAB>caminho_espelho` (espelho vazio para arquivos criados). É a FONTE para o `rollback` (lido por `rollback_session`). Aceita também o formato antigo `[estado] caminho` por retrocompatibilidade.
+
+- **`backups/history.log`** — (DEC-018) Arquivo append-only, um por pasta de backups, com uma linha por aplicação: `timestamp<TAB>N modificado(s), N criado(s)  descrição`. Leitura humana cronológica; complementar ao manifesto (não substitui, não é fonte de rollback).
+
+- **`--backup-dir PASTA`** — (DEC-018) Flag do `apply`/`rollback` que define ONDE criar a pasta `backups/` (padrão: a raiz do projeto). Permite manter o backup fora do projeto.
+
+- **Sandbox / `*_sandbox_<timestamp>/`** — (DEC-015/019) Cópia irmã do projeto criada por `apply --sandbox` (CLI) ou pelo checkbox da GUI, via `patch_engine.make_sandbox`. A instrução é aplicada na cópia; o original não é tocado. Ignora `.git`, `node_modules`, venvs, `backups/`, caches (`SANDBOX_IGNORES`).
+
+- **`self-test`** — Subcomando do CLI (`python -m src self-test`) que aplica a demo embutida num tempdir, confere resultados-chave e reverte. Verificação de instalação que não toca o disco do usuário.
+
+- **`applied_instructions.json`** — (F3, NÃO implementado) Log de auditoria mais rico de instruções aplicadas. Hoje o papel de histórico é parcialmente coberto pelo `history.log`.
 
 ---
 
@@ -79,4 +89,7 @@
 - **FIX-N** — Bug grave documentado em DECISIONS.md (ex: FIX-001).
 - **F0, F1, F2…** — Fases do roadmap em ROADMAP.md.
 - **strategy** — Campo na modification que identifica qual algoritmo usar (ex: `"replace_function"`, `"set_json_path"`).
-- **ASU** — Abreviação informal do projeto: **A**utualizador de **S**cripts **U**niversal (pode virar nome de pacote: `asu` ou `auto-script-updater`).
+- **ASU** — Abreviação informal do projeto (Atualizador Automático de Scripts; pacote: `asu` ou `auto-script-updater`).
+- **`backup_location` × `root_path`** — Parâmetros distintos de `apply_instruction`: `root_path` é a base dos caminhos relativos (e encurta o espelho — FIX-008); `backup_location` é só onde a pasta `backups/` mora (DEC-018). Por padrão são iguais.
+- **`_MISSING`** — Sentinela do `json_strategy._walk` que distingue "chave ausente" de "valor `null`" (FIX-005), permitindo deletar chaves nulas.
+- **`SandboxError`** — Exceção do core levantada por `make_sandbox` quando a instrução tem `path_mode=absolute` (que escaparia da cópia). O CLI a traduz em stderr + exit 2; a GUI mostra um diálogo.

@@ -128,6 +128,27 @@ class BackupManager:
         manifest.write_text("\n".join(linhas) + "\n", encoding="utf-8")
         return manifest
 
+    def append_history(self, description: str = "") -> Path:
+        """Acrescenta uma linha ao log consolidado ``backups/history.log``.
+
+        Um único arquivo que cresce a cada aplicação, em vez de obrigar o usuário
+        a abrir cada pasta de timestamp para saber o que aconteceu (ideia do
+        usuário). Cada linha: ``<timestamp>  <n> arquivo(s)  <descrição>``. É
+        complementar ao manifesto por sessão (que continua sendo a fonte para o
+        rollback) — aqui é só leitura humana cronológica.
+        """
+        backups_dir = Path(self.backup_root) / "backups"
+        backups_dir.mkdir(parents=True, exist_ok=True)
+        history = backups_dir / "history.log"
+        n_mod = sum(1 for e in self._entries if e.existed)
+        n_new = sum(1 for e in self._entries if not e.existed)
+        resumo = f"{n_mod} modificado(s), {n_new} criado(s)"
+        desc = f"  {description}" if description else ""
+        linha = f"{self.timestamp}\t{resumo}{desc}\n"
+        with history.open("a", encoding="utf-8") as fh:
+            fh.write(linha)
+        return history
+
 
 def rollback_session(backup_root: Path, timestamp: str) -> list[str]:
     """Desfaz uma sessão de backup a partir do seu manifesto (CLI ``rollback``).

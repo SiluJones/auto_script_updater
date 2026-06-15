@@ -23,6 +23,7 @@ from pathlib import Path
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -44,7 +45,7 @@ from ..core.instruction_parser import (
     load_instruction_from_string,
 )
 from ..core.instruction_validator import InstructionValidationError, validate
-from ..core.patch_engine import ApplyReport, apply_instruction
+from ..core.patch_engine import ApplyReport, SandboxError, apply_instruction, make_sandbox
 
 # Cores do diff (tema claro padrão do Qt). Mantidas suaves para legibilidade.
 _CSS_ADD = "color:#0a7a2f;"
@@ -159,6 +160,11 @@ class MainWindow(QMainWindow):
         acoes.addWidget(self.btn_apply)
         acoes.addWidget(self.btn_undo)
         acoes.addWidget(self.btn_copy_err)
+        self.chk_sandbox = QCheckBox("Aplicar em sandbox (cópia)")
+        self.chk_sandbox.setToolTip(
+            "Aplica numa CÓPIA do projeto (pasta irmã *_sandbox_<ts>); o original não é tocado."
+        )
+        acoes.addWidget(self.chk_sandbox)
         acoes.addStretch(1)
 
         raiz = QVBoxLayout()
@@ -321,7 +327,22 @@ class MainWindow(QMainWindow):
             self._invalidate_preview()
             return
         root_usada = self.root_edit.text().strip() or "."
-        report = self._run(dry=False)
+        # Sandbox (paridade com o CLI): aplica numa cópia irmã; original intocado.
+        if self.chk_sandbox.isChecked():
+            instruction = self._load_validated(texto)
+            if instruction is None:
+                return
+            try:
+                sandbox = make_sandbox(Path(root_usada), instruction)
+            except (SandboxError, OSError) as exc:
+                QMessageBox.critical(self, "Sandbox", str(exc))
+                return
+            root_usada = str(sandbox)
+            report = apply_instruction(
+                instruction, root_path=root_usada, dry_run=False, color=False
+            )
+        else:
+            report = self._run(dry=False)
         if report is None:
             return
         self._populate_tree(report)
@@ -333,8 +354,13 @@ class MainWindow(QMainWindow):
             self.btn_apply.setEnabled(False)
             self._set_errors([])
             self._save_last_paths()
-            extra = f"  Backup: {report.backup_dir}" if report.backup_dir else ""
-            self.statusBar().showMessage(f"Aplicado com sucesso.{extra}")
+            if self.chk_sandbox.isChecked():
+                self.statusBar().showMessage(
+                    f"Aplicado na SANDBOX: {root_usada}  (original intocado; revise e promova)."
+                )
+            else:
+                extra = f"  Backup: {report.backup_dir}" if report.backup_dir else ""
+                self.statusBar().showMessage(f"Aplicado com sucesso.{extra}")
         else:
             self._collect_report_errors(report)
             sufixo = "  (escritas revertidas pelo rollback)" if report.rolled_back else ""
