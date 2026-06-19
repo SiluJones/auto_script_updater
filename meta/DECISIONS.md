@@ -561,3 +561,27 @@ Mover a lógica de sandbox para o core (`patch_engine.make_sandbox` + `SANDBOX_I
 - Paridade: o modo seguro agora está nas duas interfaces.
 - `make_sandbox` testável isoladamente e reutilizável (ex.: futura automação/.bat poderia chamá-lo).
 - Lição reforçada: lógica compartilhável mora no core; as bordas (CLI/GUI) só adaptam entrada/saída.
+
+---
+
+## DEC-020 — ASU entra no toolchain via HUB compartilhado, em "modo só-HUB" (sem auto-aplicação do ASU sobre si)
+**Data:** 2026-06-19 · **Status:** aceita · **Origem:** sessão de integração do toolchain KCM·ASU·FlatDrop
+
+### Contexto
+O ASU deixou de ser um projeto isolado: passou a integrar um toolchain de três ferramentas que se sincronizam — **KCM** (Kit de Contexto Modular, que gera os docs de contexto), **ASU** (este, que aplica patches) e **FlatDrop** (que achata o repo para upload). As três compartilham contratos: o formato da instrução ASU (C2), a referência do formato (`INSTRUCTION_GUIDE`, C3), o manifesto FlatDrop (C1) e uma diretriz ASU que o kit pode injetar no CLAUDE.md de projetos consumidores quando o switch *asuMode* está ligado (C4). Para coordenar isso sem que uma frente quebre a outra em silêncio, criou-se um `HUB.md` — registro dos contratos e das caixas de entrada de cada frente, copiado idêntico nos três repos.
+
+Duas perguntas precisavam de decisão: (a) o ASU deve adotar o protocolo de HUB no seu CLAUDE.md? (b) o ASU deve usar a si mesmo (instrução ASU) como mecanismo de entrega do próprio código, agora que o switch existe?
+
+### Decisão
+1. **Adotar o protocolo de HUB** no CLAUDE.md do ASU: ler o `HUB.md` no ritual de início (após o STATUS), respeitar "não mexer na casa do outro" (toda mensagem a outra frente vira item na caixa dela, assinado `[ASU AAAA-MM-DD]`), e ao encerrar uma sessão que toque o grupo, processar a própria caixa, atualizar o status relâmpago e entregar o `HUB.md` completo para o usuário sincronizar nos outros repos. A seção foi **adaptada** à realidade deste toolchain (HUB de infraestrutura, manual, só-gatilho), não copiada da versão genérica que o kit gera para grupos de conteúdo.
+2. **Modo só-HUB (não usar o ASU sobre si):** o CLAUDE.md do ASU recebe a seção de HUB, mas NÃO a diretriz «Saída via ASU (patch)». O ASU continua sendo desenvolvido normalmente (arquivos Python inteiros / zips versionados pela ferramenta de código). A diretriz de saída-via-ASU é para projetos CONSUMIDORES do ASU, não para o repo do ASU. Auto-aplicar o ASU sobre o próprio motor concentraria o risco que o produto existe para mitigar (mudança aplicada sem validação semântica) no lugar mais sensível possível — o código que aplica as mudanças de todo mundo.
+
+### Alternativas consideradas
+- **Adotar a seção de HUB genérica do kit, sem adaptar** — descartado: ela fala em "HUB gerado pela página HUB do kit" e dá exemplos de domínio de conteúdo (lore, visual, som). O HUB deste toolchain é explicitamente manual e de infraestrutura; usar o texto genérico criaria descrição falsa do mecanismo.
+- **Ligar o switch asuMode também no repo do ASU (dogfooding total)** — sedutor como prova de conceito, mas adiado: o ganho (dogfooding) não compensa o risco no motor, e o dogfooding já acontece em outro nível (o `asu-switch.yaml` foi o ASU modificando o **KCM**, não o ASU modificando o ASU). Reavaliar só se houver uma rede de validação pós-patch (ver IDEAS, "validação de sintaxe pós-aplicação").
+- **Não criar HUB; coordenar as três frentes ad hoc** — descartado: sem um registro de contratos, uma mudança de `format_version` ou de manifesto se aplicaria calada e quebraria a frente consumidora tarde, quando o conserto é mais caro (risco de *drift* confirmado na literatura de polyrepo).
+
+### Consequências
+- O ASU passa a ter uma dependência de processo (manter o `HUB.md` sincronizado nos três repos à mão) — barata na escala atual (três frentes), a reavaliar se crescer.
+- O CLAUDE.md cresceu com a seção de HUB + dois gatilhos novos na tabela + uma linha na lista de fim de sessão; nenhum princípio existente foi removido (mudança aditiva).
+- Fica registrado o limite do dogfooding: o ASU pode modificar as OUTRAS frentes do toolchain (fez isso com o KCM), mas não a si mesmo por ora.
