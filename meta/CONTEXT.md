@@ -68,7 +68,8 @@ auto_script_updater/
 └── .gitignore                         # ignora backups/, examples/demo_project/src/health.py, *_sandbox_*/
 
 # NÃO versionados no Projeto (vivem no Git): logs/AAAA-MM-DD.md (logs de sessão).
-# Docs de contexto (meta/): CLAUDE, CONTEXT, STATUS, DECISIONS, CHANGELOG, IDEAS, ROADMAP, GLOSSARY, HISTORICO, LOG-TEMPLATE.
+# Docs de contexto (meta/): CEREBRO (ex-CLAUDE), CONTEXT, STATUS, DECISIONS, CHANGELOG, IDEAS, ROADMAP, GLOSSARY, HISTORICO, LOG-TEMPLATE.
+# Raiz do repo (modo Claude Code): CLAUDE.md (ponteiro curto p/ o Code) + .claude/ (settings.json + commands/). HUB.md do toolchain vive na pasta-raiz comum aos 3 projetos (não dentro deste repo).
 ```
 
 ## Ambiente e fluxo de trabalho com o Claude (CRÍTICO para a continuidade)
@@ -77,7 +78,8 @@ auto_script_updater/
 - **Pasta do projeto no Windows:** `C:\Users\alexk\Arquiteturas\ASU\auto_script_updater`.
 - **Como o usuário sobe o projeto:** ACHATADO via FlatDrop, que gera um `_MANIFEST.md` mapeando nome-plano → caminho-real (arquivos em `/mnt/project/` sem subpastas, com sufixo `__pasta` em colisões). SEMPRE consultar o manifest antes de deduzir nomes/estrutura; entregar pelo nome/caminho REAL.
 - **Onde o código vive no container:** `/home/claude/auto_script_updater/` (árvore íntegra, persiste entre compactações). Entregas vão para `/mnt/user-data/outputs/` (zips versionados `asu_vX.Y.Z.zip`, módulos avulsos em `src_changed/`, docs em `meta/`/`docs/`/`logs/`).
-- **Princípios do trabalho (CLAUDE.md):** entregar arquivos COMPLETOS ao fim da sessão; uma fonte de verdade por dado; turnos densos (custam quota); PT-BR conciso; NÃO regenerar docs no meio da sessão; ir à causa raiz; pesquisar para refinar E refutar; mudança mínima que resolve.
+- **Desenvolvimento com Claude Code (desde 2026-06-21, DEC-021):** além do chat de planejamento, o projeto usa o **Claude Code** (CLI/desktop). Duas raias — o **chat** AUTORA docs (arquivo inteiro p/ reescrita; **spec** em `meta/specs/` p/ delta em doc grande); o **Code** implementa `src/`/`tests/`, faz edições **append-only** nos `meta/`, aplica specs, roda validação (`python -m pytest`, `python -m src self-test`, `ruff`, `black`) e commita. O comportamento detalhado está em `meta/CEREBRO.md`; o `CLAUDE.md` da raiz é só o ponteiro curto que o Code lê a cada sessão.
+- **Princípios do trabalho (CEREBRO.md):** entregar arquivos COMPLETOS ao fim da sessão; uma fonte de verdade por dado; turnos densos (custam quota); PT-BR conciso; NÃO regenerar docs no meio da sessão; ir à causa raiz; pesquisar para refinar E refutar; mudança mínima que resolve.
 
 ## Como o Arquivo de Instrução Funciona (CRÍTICO)
 O arquivo de instrução (`.yaml`; JSON também aceito) é gerado pela IA e consumido pela ferramenta. Hierarquia:

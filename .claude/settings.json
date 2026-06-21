@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read", "Edit", "Grep", "Glob",
+      "Bash(python -m pytest:*)",
+      "Bash(python -m src:*)",
+      "Bash(ruff:*)",
+      "Bash(black:*)",
+      "Bash(git status:*)", "Bash(git diff:*)", "Bash(git add:*)", "Bash(git commit:*)", "Bash(git push:*)"
+    ],
+    "deny": ["Bash(rm -rf:*)"]
+  }
+}
