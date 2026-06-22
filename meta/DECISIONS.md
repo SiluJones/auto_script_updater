@@ -609,3 +609,30 @@ O Kit de Contexto (KCM) lançou uma atualização que introduz um fluxo de desen
 - A partir da próxima sessão, deltas pequenos em docs grandes (DECISIONS, CONTEXT, ROADMAP) podem ir por **spec** para o Code aplicar, em vez de o chat reentregar o arquivo inteiro — economiza tokens e dá um `git diff` limpo.
 - Pendência de configuração fora dos arquivos: as **Instruções do Projeto** (no painel do Projeto, lidas em toda mensagem) ainda referenciam `CLAUDE.md` — precisam apontar para `CEREBRO.md`. Isso é ajuste manual do usuário no painel; não é um arquivo que o assistente entrega.
 - Risco a vigiar: o medo já registrado (DEC-020/IDEAS) de o ASU editar `.md` de prosa sem sinalização agora tem um vizinho — o Code fazendo edições append-only nos `meta/`. Mitigação: append-only é de baixo risco (só acrescenta), e o `git diff` é a rede antes de cada commit.
+
+---
+
+## DEC-022 — Acesso rápido a projetos: args de lançamento, `.bat` via python-do-venv, e resolução pasta→instrução
+**Data:** 2026-06-22 · **Status:** aceita · **Origem:** pedido do usuário (praticidade: recentes/fixadas + atalho .bat por projeto). Implementação specada em `meta/specs/F2-acesso-rapido.md`.
+
+### Contexto
+O usuário trabalha em vários projetos que consomem o ASU e quer reduzir o atrito de abrir a GUI já apontada para cada um. Pediu duas coisas: (a) pastas-raiz recentes/fixadas dentro da GUI; (b) um botão que gere um `.bat` "atalho", colocado na pasta-pai da raiz do projeto, que reabra a GUI com a raiz marcada e a instrução pronta. Surgiram três decisões de design não óbvias.
+
+### Decisão
+1. **A GUI passa a aceitar argumentos** (`--root`, `--instruction-dir`, `--instruction`) via `argparse` em `src/gui/__main__.py`, repassados a `run()`/`MainWindow`. Sem argumentos, comportamento idêntico ao atual.
+2. **O `.bat` gerado chama `.venv\Scripts\python.exe -m src.gui` DIRETO, sem `call activate`.** Boas práticas de launcher no Windows (Python docs + comunidade): para um atalho que depende de libs do venv, apontar direto para o python do venv é mais robusto que ativar (sem efeitos colaterais de ativação; funciona de atalho/Task Scheduler).
+3. **O `.bat` passa uma PASTA de instrução (`--instruction-dir`), não um arquivo**, porque os nomes das instruções mudam (arquivamento). A GUI resolve pasta→arquivo escaneando **só o topo** da pasta (não recursivo): exatamente 1 yaml → pré-preenche; 0 ou 2+ → abre o seletor já posicionado na pasta. Instruções arquivadas em SUBpastas são ignoradas de propósito. Isso responde ao "perigo de ter vários yaml na pasta" sem nunca escolher o errado em silêncio.
+4. **Caminhos do `.bat`:** `ASU_HOME` absoluto (a GUI se localiza por `__file__`); `--instruction-dir "%~dp0"` (a própria pasta do `.bat`); `--root` relativo a `%~dp0` quando a raiz é descendente da pasta do `.bat` (caso do exemplo do usuário), senão absoluto — deixa o `.bat` portátil quando o layout permite.
+5. **Recentes (até 8) e fixadas** persistem no `QSettings` já usado pela GUI (novas chaves `recent_roots`/`pinned_roots`); um menu "Recentes ▾" + botão "📌" ao lado da raiz.
+
+### Alternativas consideradas
+- **Fixar o caminho de um `.yaml` específico no `.bat`** — descartado: os nomes mudam; quebraria no primeiro arquivamento. Daí a PASTA + resolução.
+- **`.bat` com `call .venv\Scripts\activate`** (como o usuário esboçou) — funciona, mas é menos robusto que o python-do-venv direto; trocado por D1.
+- **Resolver instrução recursivamente / pegar a mais recente por mtime** — descartado: arrastaria as arquivadas das subpastas e poderia escolher a errada; o escaneamento só-do-topo + "1 ou escolha" é previsível e seguro.
+- **Auto-aplicar a partir do `.bat`** — jamais: o usuário foi explícito ("não quero que pule o dry e eu checar"). O `.bat` só PRÉ-PREENCHE; o dry-run e a revisão continuam manuais. Mantém a regra de ouro do ASU.
+
+### Consequências
+- O ASU ganha uma porta de entrada por projeto sem terminal, sem comprometer a revisão humana.
+- `python -m src.gui` deixa de ser argumento-zero — `__main__.py` passa a ter uma camada de CLI fina (mais um ponto a manter, trivial).
+- As funções puras (`build_launcher_bat`, `resolve_instruction_in_dir`) são testáveis sem Qt — o grosso da cobertura desta feature mora nelas.
+- O gerador de `.bat` saiu da F3 e entrou na F2 (acoplado aos args e às recentes); registrado no ROADMAP.

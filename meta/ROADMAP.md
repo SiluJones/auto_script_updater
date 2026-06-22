@@ -44,10 +44,17 @@
 **Objetivo:** GUI completa em PySide6. Usuário abre instrução, vê diff colorido por arquivo, define pasta raiz, aplica com um clique — sem usar terminal.
 **Critério de conclusão:** Fluxo completo sem terminal: abrir instrução → validar e exibir confiança → configurar raiz → previsualizar diff → aplicar → ver resultado; rollback disponível via botão.
 
+**▶ Increment ativo (2026-06-22): "Acesso rápido a projetos"** — spec em `meta/specs/F2-acesso-rapido.md`, para o Claude Code implementar. Reúne os itens de praticidade que o usuário pediu:
+- [ ] Pastas-raiz **recentes** (até 8) + **fixadas** (favoritas) num menu ao lado da raiz — substitui/expande o "histórico dos últimos 5" abaixo.
+- [ ] **Argumentos de linha de comando** da GUI (`--root`, `--instruction-dir`, `--instruction`) para abrir já apontada a um projeto.
+- [ ] Botão **"Criar atalho .bat…"** — gera um `.bat` por projeto (na pasta-pai da raiz) que reabre a GUI apontada para o projeto (chama o python do venv DIRETO, sem `activate` — DEC-022). [movido da F3]
+- [ ] Resolução **pasta→instrução** (escaneia só o topo; 1 yaml = pré-preenche, 2+ = abre o seletor na pasta) — lida com o "perigo de vários yaml" (DEC-022).
+
+**Itens estruturais restantes da F2 (próximo increment):**
 - [x] `src/gui/main_window.py` — janela principal, barra de menu, barra de status.
 - [x] Árvore de arquivos afetados com ícone de status por arquivo (🟢/🔴/⚪) e por modificação (✓/✗) — integrada na main_window; o 🟡 aguarda o canal de warnings (IDEAS).
 - [~] Diff colorido por arquivo integrado na main_window (HTML, verde/vermelho); syntax highlight por linguagem ainda pendente.
-- [~] Seletor de raiz lembra o ÚLTIMO uso (QSettings); histórico dos últimos 5 ainda pendente.
+- [~] Seletor de raiz lembra o ÚLTIMO uso (QSettings); recentes+fixadas chegam no increment ativo acima.
 - [ ] Barra de progresso durante aplicação de instruções com muitos arquivos.
 - [x] Modo dry-run na GUI — o botão "Pré-visualizar" É um dry-run (sempre antes de aplicar; desenho mais seguro que checkbox).
 - [x] Botão "Copiar erro para a IA" — copia erros + ref. ao guia para colar na IA geradora (loop de autocorreção).
@@ -69,7 +76,7 @@
 - [ ] Histórico de instruções aplicadas (`applied_instructions.json`) com visualizador.
 - [ ] Checksum SHA-256 dos arquivos antes/depois registrado no log.
 - [ ] Modo comparação acumulada pós-aplicação (diff de todos os arquivos numa tela).
-- [ ] Gerador de `.bat` por projeto (dry-run + pausa de confirmação; e um `.bat` que só abre a GUI) — ver IDEAS, com ressalva de segurança.
+- [→] Gerador de `.bat` por projeto — **movido para a F2** (increment "Acesso rápido", spec `meta/specs/F2-acesso-rapido.md`), por estar acoplado aos args de lançamento e às pastas recentes que o usuário pediu junto.
 - [ ] Botão/flag para copiar a SAÍDA completa (não só erro), inclusive em sucesso — ver IDEAS.
 - [~] Backup configurável: `--backup-dir` (fora do projeto) e `history.log` consolidado ENTREGUES (DEC-018); limpeza automática de backups antigos (manter últimos N/X dias) ainda PENDENTE.
 - [ ] Packaging PyInstaller como `.exe` standalone Windows (UPX para compressão).
