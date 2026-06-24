@@ -225,3 +225,110 @@ def test_gui_sandbox_checkbox_applies_on_copy(app, demo_root):
     irmas = list(demo_root.parent.glob(f"{demo_root.name}_sandbox_*"))
     assert len(irmas) == 1
     assert (irmas[0] / "src" / "health.py").exists()
+
+
+# ── WI-1: recentes e fixadas ──────────────────────────────────────────────
+
+
+def _clear_recents(win: MainWindow) -> None:
+    win._settings.remove("recent_roots")
+    win._settings.remove("pinned_roots")
+
+
+def test_push_recent_root_adds_and_deduplicates(app):
+    """_push_recent_root: insere no topo e remove duplicata case-insensitive."""
+    win = MainWindow()
+    _clear_recents(win)
+    try:
+        win._push_recent_root("/proj/a")
+        win._push_recent_root("/proj/b")
+        win._push_recent_root("/proj/a")  # duplicata — sobe ao topo
+        recentes = win._load_recent_roots()
+        assert recentes[0] == "/proj/a"
+        assert recentes[1] == "/proj/b"
+        assert recentes.count("/proj/a") == 1
+    finally:
+        _clear_recents(win)
+
+
+def test_push_recent_root_max_8(app):
+    """_push_recent_root: lista nunca ultrapassa 8 itens."""
+    win = MainWindow()
+    _clear_recents(win)
+    try:
+        for i in range(10):
+            win._push_recent_root(f"/proj/{i}")
+        assert len(win._load_recent_roots()) == 8
+    finally:
+        _clear_recents(win)
+
+
+def test_toggle_pin_root_add_and_remove(app):
+    """_toggle_pin_root: adiciona e remove da lista de fixadas."""
+    win = MainWindow()
+    _clear_recents(win)
+    try:
+        win._toggle_pin_root("/proj/x")
+        assert "/proj/x" in win._load_pinned_roots()
+        win._toggle_pin_root("/proj/x")  # desafixar
+        assert "/proj/x" not in win._load_pinned_roots()
+    finally:
+        _clear_recents(win)
+
+
+def test_preview_pushes_recent_root(app, demo_root):
+    """preview() bem-sucedido adiciona a raiz à lista de recentes."""
+    win = MainWindow()
+    _clear_recents(win)
+    try:
+        win.root_edit.setText(str(demo_root))
+        win.instr_edit.setText(str(_REPO / "examples" / "demo.yaml"))
+        win.preview()
+        assert str(demo_root) in win._load_recent_roots()
+    finally:
+        _clear_recents(win)
+
+
+# ── WI-2: argumentos de lançamento ──────────────────────────────────────
+
+
+def test_mainwindow_root_arg_preenchido(app, demo_root):
+    """--root pré-preenche o campo de raiz."""
+    win = MainWindow(root=str(demo_root))
+    assert win.root_edit.text() == str(demo_root)
+
+
+def test_mainwindow_instruction_arg_preenchido(app, tmp_path):
+    """--instruction pré-preenche o campo de instrução."""
+    arq = tmp_path / "test.yaml"
+    arq.write_text("x: 1")
+    win = MainWindow(instruction=str(arq))
+    assert win.instr_edit.text() == str(arq)
+
+
+def test_mainwindow_instruction_dir_um_yaml(app, tmp_path):
+    """--instruction-dir com 1 yaml pré-preenche o campo de instrução."""
+    (tmp_path / "instr.yaml").write_text("x: 1")
+    win = MainWindow(instruction_dir=str(tmp_path))
+    assert win.instr_edit.text() == str(tmp_path / "instr.yaml")
+    assert win._instruction_start_dir == str(tmp_path)
+
+
+def test_mainwindow_instruction_dir_muitos_yamls(app, tmp_path):
+    """--instruction-dir com 2+ yamls aponta o seletor mas nao auto-seleciona."""
+    (tmp_path / "a.yaml").write_text("x: 1")
+    (tmp_path / "b.yaml").write_text("y: 2")
+    win = MainWindow(instruction_dir=str(tmp_path))
+    assert win._instruction_start_dir == str(tmp_path)
+    # nenhum yaml foi escolhido automaticamente
+    instr = win.instr_edit.text()
+    assert instr not in [str(tmp_path / "a.yaml"), str(tmp_path / "b.yaml")]
+
+
+def test_btn_bat_habilitado_com_raiz(app, demo_root):
+    """Botão .bat habilitado somente quando a raiz está preenchida."""
+    win = MainWindow()
+    win.root_edit.setText("")
+    assert not win.btn_bat.isEnabled()
+    win.root_edit.setText(str(demo_root))
+    assert win.btn_bat.isEnabled()

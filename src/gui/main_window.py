@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPushButton,
     QSplitter,
@@ -60,6 +61,8 @@ _STATUS_LABEL = {
     "skipped": "ignorado",
 }
 
+_MAX_RECENTS = 8
+
 
 def _diff_to_html(diff: str) -> str:
     """Converte um unified diff (sem ANSI) em HTML colorido linha a linha."""
@@ -81,7 +84,13 @@ def _diff_to_html(diff: str) -> str:
 class MainWindow(QMainWindow):
     """Janela única do ASU: prévia, aplicação e rollback de instruções."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        root: str | None = None,
+        instruction_dir: str | None = None,
+        instruction: str | None = None,
+    ) -> None:
         super().__init__()
         self.setWindowTitle("Atualizador Automático de Scripts")
         self.resize(1000, 640)
@@ -97,12 +106,20 @@ class MainWindow(QMainWindow):
         self._pasted_text: str | None = None
         self._last_errors: list[str] = []  # alimenta "Copiar erro para a IA"
         self._settings = QSettings("auto-script-updater", "gui")
+        # Pasta-inicial do seletor de instrução (definida por --instruction-dir).
+        self._instruction_start_dir: str | None = None
 
         # ── Linha 1: raiz do projeto ────────────────────────────────────────
         self.root_edit = QLineEdit()
         self.root_edit.setPlaceholderText("Pasta raiz do projeto (para caminhos relativos)")
         btn_root = QPushButton("Escolher…")
         btn_root.clicked.connect(self._pick_root)
+        self.btn_recentes = QPushButton("Recentes ▾")
+        self.btn_recentes.setToolTip("Pastas raiz recentes e fixadas")
+        self.btn_recentes.clicked.connect(self._show_recents_menu)
+        self.btn_pin = QPushButton("📌")
+        self.btn_pin.setToolTip("Fixar/desafixar a pasta raiz atual")
+        self.btn_pin.clicked.connect(self._toggle_current_pin)
 
         # ── Linha 2: arquivo de instrução ───────────────────────────────────
         self.instr_edit = QLineEdit()
@@ -130,6 +147,14 @@ class MainWindow(QMainWindow):
         )
         self.btn_copy_err.setEnabled(False)
         self.btn_copy_err.clicked.connect(self.copy_errors_for_ai)
+        self.btn_bat = QPushButton("Criar atalho .bat…")
+        self.btn_bat.setToolTip(
+            "Gera um .bat que reabre a GUI já apontada para este projeto (python do venv direto)."
+        )
+        self.btn_bat.setEnabled(False)
+        self.btn_bat.clicked.connect(self._create_launcher_bat)
+        # Habilita/desabilita o botão .bat conforme a raiz é preenchida.
+        self.root_edit.textChanged.connect(self._on_root_text_changed)
 
         # ── Árvore de arquivos + diff ───────────────────────────────────────
         self.tree = QTreeWidget()
@@ -150,6 +175,8 @@ class MainWindow(QMainWindow):
         topo1.addWidget(QLabel("Raiz:"))
         topo1.addWidget(self.root_edit, 1)
         topo1.addWidget(btn_root)
+        topo1.addWidget(self.btn_recentes)
+        topo1.addWidget(self.btn_pin)
         topo2 = QHBoxLayout()
         topo2.addWidget(QLabel("Instrução:"))
         topo2.addWidget(self.instr_edit, 1)
@@ -160,6 +187,7 @@ class MainWindow(QMainWindow):
         acoes.addWidget(self.btn_apply)
         acoes.addWidget(self.btn_undo)
         acoes.addWidget(self.btn_copy_err)
+        acoes.addWidget(self.btn_bat)
         self.chk_sandbox = QCheckBox("Aplicar em sandbox (cópia)")
         self.chk_sandbox.setToolTip(
             "Aplica numa CÓPIA do projeto (pasta irmã *_sandbox_<ts>); o original não é tocado."
@@ -178,6 +206,15 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Escolha a raiz e a instrução, depois pré-visualize.")
         self._restore_last_paths()
 
+        # Sobrepõe com argumentos de lançamento (WI-2) — depois de _restore_last_paths.
+        if root is not None:
+            self.root_edit.setText(root)
+        if instruction is not None:
+            self._pasted_text = None
+            self.instr_edit.setText(instruction)
+        elif instruction_dir is not None:
+            self._apply_instruction_dir(instruction_dir)
+
     # ── Seleção de caminhos ────────────────────────────────────────────────
     def _pick_root(self) -> None:
         pasta = QFileDialog.getExistingDirectory(self, "Pasta raiz do projeto")
@@ -185,8 +222,9 @@ class MainWindow(QMainWindow):
             self.root_edit.setText(pasta)
 
     def _pick_instruction(self) -> None:
+        start = self._instruction_start_dir or ""
         arq, _ = QFileDialog.getOpenFileName(
-            self, "Arquivo de instrução", "", "Instruções (*.yaml *.yml *.json)"
+            self, "Arquivo de instrução", start, "Instruções (*.yaml *.yml *.json)"
         )
         if arq:
             self._pasted_text = None
@@ -211,6 +249,9 @@ class MainWindow(QMainWindow):
         if novo != self.PASTED_MARK:
             self._pasted_text = None
         self._invalidate_preview()
+
+    def _on_root_text_changed(self, text: str) -> None:
+        self.btn_bat.setEnabled(bool(text.strip()))
 
     def _invalidate_preview(self) -> None:
         """Qualquer mudança de entrada exige nova prévia antes de aplicar."""
@@ -248,6 +289,83 @@ class MainWindow(QMainWindow):
         self._settings.setValue("last_root", self.root_edit.text().strip())
         if self.instr_edit.text() != self.PASTED_MARK:
             self._settings.setValue("last_instruction", self.instr_edit.text().strip())
+
+    # ── Recentes e fixadas (WI-1) ──────────────────────────────────────────
+    def _load_recent_roots(self) -> list[str]:
+        val = self._settings.value("recent_roots", [])
+        if isinstance(val, str):
+            val = [val] if val else []
+        return [v for v in val if v]
+
+    def _load_pinned_roots(self) -> list[str]:
+        val = self._settings.value("pinned_roots", [])
+        if isinstance(val, str):
+            val = [val] if val else []
+        return [v for v in val if v]
+
+    def _push_recent_root(self, path: str) -> None:
+        """Insere no topo, remove duplicata (case-insensitive), corta em 8 itens."""
+        if not path:
+            return
+        recents = self._load_recent_roots()
+        path_lower = path.lower()
+        recents = [r for r in recents if r.lower() != path_lower]
+        recents.insert(0, path)
+        self._settings.setValue("recent_roots", recents[:_MAX_RECENTS])
+
+    def _toggle_pin_root(self, path: str) -> None:
+        """Adiciona ou remove *path* das fixadas."""
+        if not path:
+            return
+        pinned = self._load_pinned_roots()
+        path_lower = path.lower()
+        if any(p.lower() == path_lower for p in pinned):
+            pinned = [p for p in pinned if p.lower() != path_lower]
+        else:
+            pinned.append(path)
+        self._settings.setValue("pinned_roots", pinned)
+
+    def _show_recents_menu(self) -> None:
+        menu = QMenu(self)
+        pinned = self._load_pinned_roots()
+        recents = self._load_recent_roots()
+        if pinned:
+            menu.addSection("Fixadas")
+            for p in pinned:
+                act = menu.addAction(f"📌 {p}")
+                act.triggered.connect(lambda _checked=False, path=p: self.root_edit.setText(path))
+        if recents:
+            menu.addSection("Recentes")
+            for r in recents:
+                act = menu.addAction(r)
+                act.triggered.connect(lambda _checked=False, path=r: self.root_edit.setText(path))
+        if not pinned and not recents:
+            menu.addAction("(sem histórico)").setEnabled(False)
+        menu.exec(self.btn_recentes.mapToGlobal(self.btn_recentes.rect().bottomLeft()))
+
+    def _toggle_current_pin(self) -> None:
+        path = self.root_edit.text().strip()
+        if path:
+            self._toggle_pin_root(path)
+
+    # ── Argumentos de lançamento (WI-2) ───────────────────────────────────
+    def _apply_instruction_dir(self, directory: str) -> None:
+        """Resolve a pasta de instrução (D3): 1 yaml → pré-preenche; 0 ou 2+ → aponta seletor."""
+        from .launcher import resolve_instruction_in_dir
+
+        self._instruction_start_dir = directory
+        kind, files = resolve_instruction_in_dir(directory)
+        if kind == "one":
+            self._pasted_text = None
+            self.instr_edit.setText(str(files[0]))
+        else:
+            n = len(files)
+            dica = (
+                f"{n} instrucoes nesta pasta -- clique Abrir para escolher"
+                if n > 1
+                else "Nenhuma instrucao nesta pasta -- clique Abrir para escolher"
+            )
+            self.statusBar().showMessage(dica)
 
     # ── Núcleo: carregar + executar ────────────────────────────────────────
     def _load_validated(self, texto: str) -> dict | None:
@@ -290,6 +408,7 @@ class MainWindow(QMainWindow):
         if ok:
             self._set_errors([])
             self._save_last_paths()
+            self._push_recent_root(self.root_edit.text().strip())  # WI-1
         else:
             self._collect_report_errors(report)
         resumo = self._resumo(report)
@@ -326,7 +445,8 @@ class MainWindow(QMainWindow):
             )
             self._invalidate_preview()
             return
-        root_usada = self.root_edit.text().strip() or "."
+        root_original = self.root_edit.text().strip() or "."
+        root_usada = root_original
         # Sandbox (paridade com o CLI): aplica numa cópia irmã; original intocado.
         if self.chk_sandbox.isChecked():
             instruction = self._load_validated(texto)
@@ -354,6 +474,7 @@ class MainWindow(QMainWindow):
             self.btn_apply.setEnabled(False)
             self._set_errors([])
             self._save_last_paths()
+            self._push_recent_root(root_original)  # WI-1: push a raiz original (não a sandbox)
             if self.chk_sandbox.isChecked():
                 self.statusBar().showMessage(
                     f"Aplicado na SANDBOX: {root_usada}  (original intocado; revise e promova)."
@@ -416,6 +537,49 @@ class MainWindow(QMainWindow):
             f"{len(self._last_errors)} erro(s) copiados — cole na conversa com a IA geradora."
         )
 
+    # ── Gerador de atalho por projeto (WI-4) ──────────────────────────────
+    def _create_launcher_bat(self) -> None:
+        """Gera um .bat que reabre a GUI já apontada para o projeto atual."""
+        from .launcher import build_launcher_bat
+
+        root_str = self.root_edit.text().strip()
+        if not root_str:
+            return
+        project_root = Path(root_str)
+        # asu_home: src/gui/main_window.py → src/gui → src → raiz do ASU
+        asu_home = Path(__file__).resolve().parent.parent.parent
+        venv_python = asu_home / ".venv" / "Scripts" / "python.exe"
+
+        default_dir = project_root.parent
+        default_name = f"abrir-asu-{project_root.name}.bat"
+        destino, _ = QFileDialog.getSaveFileName(
+            self,
+            "Salvar atalho .bat",
+            str(default_dir / default_name),
+            "Scripts batch (*.bat)",
+        )
+        if not destino:
+            return
+
+        destino_path = Path(destino)
+        texto = build_launcher_bat(
+            asu_home=asu_home, project_root=project_root, bat_dir=destino_path.parent
+        )
+        try:
+            destino_path.write_text(texto, encoding="ascii", errors="replace")
+        except OSError as exc:
+            QMessageBox.critical(self, "Criar atalho", f"Nao foi possivel escrever: {exc}")
+            return
+
+        if not venv_python.exists():
+            aviso = f"ATENCAO: {venv_python} nao encontrado -- confirme o caminho do venv."
+            QMessageBox.information(
+                self, "Atalho criado (aviso)", f"Atalho salvo em:\n{destino}\n\n{aviso}"
+            )
+            self.statusBar().showMessage(f"Atalho criado: {destino} -- {aviso}")
+        else:
+            self.statusBar().showMessage(f"Atalho criado: {destino}")
+
     # ── Apresentação ───────────────────────────────────────────────────────
     def _populate_tree(self, report: ApplyReport) -> None:
         self.tree.clear()
@@ -462,9 +626,13 @@ class MainWindow(QMainWindow):
         return f"{c} criado(s), {m} modificado(s), {u} inalterado(s), {x} falha(s)."
 
 
-def run() -> int:
+def run(
+    root: str | None = None,
+    instruction_dir: str | None = None,
+    instruction: str | None = None,
+) -> int:
     """Ponto de entrada da GUI (``python -m src.gui``)."""
     app = QApplication.instance() or QApplication([])
-    win = MainWindow()
+    win = MainWindow(root=root, instruction_dir=instruction_dir, instruction=instruction)
     win.show()
     return app.exec()
