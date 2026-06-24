@@ -44,11 +44,11 @@
 **Objetivo:** GUI completa em PySide6. Usuário abre instrução, vê diff colorido por arquivo, define pasta raiz, aplica com um clique — sem usar terminal.
 **Critério de conclusão:** Fluxo completo sem terminal: abrir instrução → validar e exibir confiança → configurar raiz → previsualizar diff → aplicar → ver resultado; rollback disponível via botão.
 
-**▶ Increment ativo (2026-06-22): "Acesso rápido a projetos"** — spec em `meta/specs/F2-acesso-rapido.md`, para o Claude Code implementar. Reúne os itens de praticidade que o usuário pediu:
-- [ ] Pastas-raiz **recentes** (até 8) + **fixadas** (favoritas) num menu ao lado da raiz — substitui/expande o "histórico dos últimos 5" abaixo.
-- [ ] **Argumentos de linha de comando** da GUI (`--root`, `--instruction-dir`, `--instruction`) para abrir já apontada a um projeto.
-- [ ] Botão **"Criar atalho .bat…"** — gera um `.bat` por projeto (na pasta-pai da raiz) que reabre a GUI apontada para o projeto (chama o python do venv DIRETO, sem `activate` — DEC-022). [movido da F3]
-- [ ] Resolução **pasta→instrução** (escaneia só o topo; 1 yaml = pré-preenche, 2+ = abre o seletor na pasta) — lida com o "perigo de vários yaml" (DEC-022).
+**✅ Increment "Acesso rápido a projetos" concluído (2026-06-23)** — spec `meta/specs/F2-acesso-rapido.md` implementada pelo Claude Code. 112 testes verdes; ruff/black limpos.
+- [x] Pastas-raiz **recentes** (até 8) + **fixadas** (favoritas) num menu ao lado da raiz — substitui/expande o "histórico dos últimos 5" abaixo.
+- [x] **Argumentos de linha de comando** da GUI (`--root`, `--instruction-dir`, `--instruction`) para abrir já apontada a um projeto.
+- [x] Botão **"Criar atalho .bat…"** — gera um `.bat` por projeto (na pasta-pai da raiz) que reabre a GUI apontada para o projeto (chama o python do venv DIRETO, sem `activate` — DEC-022). [movido da F3]
+- [x] Resolução **pasta→instrução** (escaneia só o topo; 1 yaml = pré-preenche, 2+ = abre o seletor na pasta) — lida com o "perigo de vários yaml" (DEC-022).
 
 **Itens estruturais restantes da F2 (próximo increment):**
 - [x] `src/gui/main_window.py` — janela principal, barra de menu, barra de status.

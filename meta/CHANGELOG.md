@@ -9,6 +9,19 @@
 
 ---
 
+## [0.7.0] — 2026-06-23
+### Adicionado
+- **F2 increment "Acesso rápido a projetos"** — quatro itens implementados de uma vez:
+  - **Recentes e fixadas (WI-1):** `btn_recentes` abre menu "Recentes ▾" com seções Fixadas (📌) e Recentes; botão 📌 fixa/desafixa a raiz atual. `_push_recent_root` (máx. 8, case-insensitive) é chamado após `preview()` e `apply_changes()` OK. Persistido em `QSettings` (`recent_roots`/`pinned_roots`).
+  - **Args de lançamento (WI-2):** `python -m src.gui --root <pasta> --instruction-dir <pasta> --instruction <arquivo>` abre a GUI já apontada para o projeto. `MainWindow.__init__` aceita os kwargs; `run()` os repassa; `__main__.py` parseia via `argparse`.
+  - **Resolução pasta→instrução (WI-2/D3):** `_apply_instruction_dir` escaneia só o topo da pasta — 1 yaml = pré-preenche o campo; 0 ou 2+ = aponta o seletor "Abrir…" para essa pasta + exibe dica no status. Assim instruções arquivadas em subpastas são ignoradas de propósito.
+  - **Gerador de atalho .bat por projeto (WI-3+WI-4):** novo módulo puro `src/gui/launcher.py` (`resolve_instruction_in_dir` + `build_launcher_bat`); botão "Criar atalho .bat…" na GUI. O `.bat` gerado chama `.venv\Scripts\python.exe` direto (sem `activate` — DEC-022), com `--root` relativo a `%~dp0` quando o projeto é descendente da pasta do `.bat`, absoluto caso contrário.
+
+### Qualidade
+- Testes: 93 → **112** (+10 em `tests/test_launcher.py` para funções puras + 9 em `tests/test_gui_smoke.py` para WI-1/WI-2); ruff/black limpos; versão `0.7.0`.
+
+---
+
 ## [0.6.0] — 2026-06-15
 ### Adicionado
 - **`--backup-dir PASTA` (apply e rollback) — DEC-018:** permite criar a pasta `backups/` FORA do projeto (padrão segue sendo a raiz do projeto). Mantém a árvore do projeto 100% limpa. O `rollback` aceita o mesmo `--backup-dir` (com `--root` como fallback) para localizar a pasta quando ela está fora.
