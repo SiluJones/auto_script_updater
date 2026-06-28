@@ -565,20 +565,22 @@ class MainWindow(QMainWindow):
         texto = build_launcher_bat(
             asu_home=asu_home, project_root=project_root, bat_dir=destino_path.parent
         )
+        enc = "ascii" if texto.isascii() else "utf-8"
         try:
-            destino_path.write_text(texto, encoding="ascii", errors="replace")
+            destino_path.write_text(texto, encoding=enc)
         except OSError as exc:
             QMessageBox.critical(self, "Criar atalho", f"Nao foi possivel escrever: {exc}")
             return
 
+        enc_nota = " (caminho com acento -- .bat em UTF-8/chcp)" if enc == "utf-8" else ""
         if not venv_python.exists():
             aviso = f"ATENCAO: {venv_python} nao encontrado -- confirme o caminho do venv."
             QMessageBox.information(
                 self, "Atalho criado (aviso)", f"Atalho salvo em:\n{destino}\n\n{aviso}"
             )
-            self.statusBar().showMessage(f"Atalho criado: {destino} -- {aviso}")
+            self.statusBar().showMessage(f"Atalho criado: {destino}{enc_nota} -- {aviso}")
         else:
-            self.statusBar().showMessage(f"Atalho criado: {destino}")
+            self.statusBar().showMessage(f"Atalho criado: {destino}{enc_nota}")
 
     # ── Apresentação ───────────────────────────────────────────────────────
     def _populate_tree(self, report: ApplyReport) -> None:

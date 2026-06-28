@@ -46,11 +46,14 @@ def build_launcher_bat(*, asu_home: Path, project_root: Path, bat_dir: Path) -> 
         # project_root fora de bat_dir: caminho absoluto
         root_arg = str(project_root)
 
+    precisa_utf8 = not (str(asu_home).isascii() and root_arg.isascii())
+    chcp_line = "chcp 65001 >nul\n" if precisa_utf8 else ""
     return (
         "@echo off\n"
-        "REM Atalho gerado pelo ASU -- abre a interface ja apontada para este projeto.\n"
-        f'set "ASU_HOME={asu_home}"\n'
-        'pushd "%ASU_HOME%"\n'
-        f'".venv\\Scripts\\python.exe" -m src.gui --root "{root_arg}" --instruction-dir "%~dp0"\n'
-        "popd\n"
+        + chcp_line
+        + "REM Atalho gerado pelo ASU -- abre a interface ja apontada para este projeto.\n"
+        + f'set "ASU_HOME={asu_home}"\n'
+        + 'pushd "%ASU_HOME%"\n'
+        + f'".venv\\Scripts\\python.exe" -m src.gui --root "{root_arg}" --instruction-dir "%~dp0"\n'
+        + "popd\n"
     )

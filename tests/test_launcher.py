@@ -119,3 +119,34 @@ def test_build_bat_instruction_dir_uses_dp0(tmp_path):
     texto = build_launcher_bat(asu_home=asu, project_root=proj, bat_dir=bat_dir)
     assert "--instruction-dir" in texto
     assert "%~dp0" in texto
+
+
+# ── Testes de encoding ASCII (F2-bat-ascii.md) ─────────────────────────────
+
+
+def test_build_bat_ascii_paths_is_ascii(tmp_path):
+    """Caminhos ASCII: texto retornado eh 100% ASCII e nao contem 'chcp'."""
+    bat_dir = tmp_path / "bat"
+    bat_dir.mkdir()
+    project_root = tmp_path / "projeto"
+    project_root.mkdir()
+    asu_home = tmp_path / "asu"
+    asu_home.mkdir()
+
+    texto = build_launcher_bat(asu_home=asu_home, project_root=project_root, bat_dir=bat_dir)
+    assert texto.isascii(), "Texto deve ser ASCII puro quando todos os caminhos sao ASCII"
+    assert "chcp" not in texto, "Nao deve conter 'chcp' para caminhos ASCII"
+
+
+def test_build_bat_accented_path_has_chcp(tmp_path):
+    """Caminho acentuado: texto contem 'chcp 65001' e o nome acentuado intacto (nao vira '?')."""
+    bat_dir = tmp_path / "bat"
+    bat_dir.mkdir()
+    project_root = tmp_path / "Café"  # Café — 'é' eh nao-ASCII
+    project_root.mkdir()
+    asu_home = tmp_path / "asu"
+    asu_home.mkdir()
+
+    texto = build_launcher_bat(asu_home=asu_home, project_root=project_root, bat_dir=bat_dir)
+    assert "chcp 65001" in texto, "Deve conter 'chcp 65001' para caminho acentuado"
+    assert "Café" in texto, "Nome acentuado deve aparecer intacto (nao vira '?')"
