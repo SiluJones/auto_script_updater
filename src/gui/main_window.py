@@ -40,7 +40,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..core.backup_manager import rollback_session
+from ..core.backup_manager import rollback_from_dir
 from ..core.instruction_parser import (
     InstructionParseError,
     load_instruction_from_string,
@@ -132,6 +132,14 @@ class MainWindow(QMainWindow):
         # Editar o campo manualmente descarta a instrução colada.
         self.instr_edit.textChanged.connect(self._on_instr_text_changed)
 
+        # ── Linha 3: pasta de backup ─────────────────────────────────────────
+        self.backup_edit = QLineEdit()
+        self.backup_edit.setPlaceholderText(
+            "Padrão: pasta do projeto. Opcional: pasta fora do projeto."
+        )
+        btn_backup = QPushButton("Escolher…")
+        btn_backup.clicked.connect(self._pick_backup_dir)
+
         # ── Ações ───────────────────────────────────────────────────────────
         self.btn_preview = QPushButton("Pré-visualizar (dry-run)")
         self.btn_preview.clicked.connect(self.preview)
@@ -187,6 +195,10 @@ class MainWindow(QMainWindow):
         topo2.addWidget(self.instr_edit, 1)
         topo2.addWidget(btn_instr)
         topo2.addWidget(btn_paste)
+        topo3 = QHBoxLayout()
+        topo3.addWidget(QLabel("Backup:"))
+        topo3.addWidget(self.backup_edit, 1)
+        topo3.addWidget(btn_backup)
         acoes = QHBoxLayout()
         acoes.addWidget(self.btn_preview)
         acoes.addWidget(self.btn_apply)
@@ -204,6 +216,7 @@ class MainWindow(QMainWindow):
         raiz = QVBoxLayout()
         raiz.addLayout(topo1)
         raiz.addLayout(topo2)
+        raiz.addLayout(topo3)
         raiz.addLayout(acoes)
         raiz.addWidget(splitter, 1)
         central = QWidget()
@@ -226,6 +239,11 @@ class MainWindow(QMainWindow):
         pasta = QFileDialog.getExistingDirectory(self, "Pasta raiz do projeto")
         if pasta:
             self.root_edit.setText(pasta)
+
+    def _pick_backup_dir(self) -> None:
+        pasta = QFileDialog.getExistingDirectory(self, "Pasta de backup (opcional)")
+        if pasta:
+            self.backup_edit.setText(pasta)
 
     def _pick_instruction(self) -> None:
         start = self._instruction_start_dir or ""
@@ -286,15 +304,19 @@ class MainWindow(QMainWindow):
     def _restore_last_paths(self) -> None:
         raiz = self._settings.value("last_root", "")
         instr = self._settings.value("last_instruction", "")
+        bkp = self._settings.value("last_backup_dir", "")
         if raiz:
             self.root_edit.setText(str(raiz))
         if instr and instr != self.PASTED_MARK:
             self.instr_edit.setText(str(instr))
+        if bkp:
+            self.backup_edit.setText(str(bkp))
 
     def _save_last_paths(self) -> None:
         self._settings.setValue("last_root", self.root_edit.text().strip())
         if self.instr_edit.text() != self.PASTED_MARK:
             self._settings.setValue("last_instruction", self.instr_edit.text().strip())
+        self._settings.setValue("last_backup_dir", self.backup_edit.text().strip())
 
     # ── Recentes e fixadas (WI-1) ──────────────────────────────────────────
     def _load_recent_roots(self) -> list[str]:
@@ -386,7 +408,7 @@ class MainWindow(QMainWindow):
             return None
         return instruction
 
-    def _run(self, *, dry: bool) -> ApplyReport | None:
+    def _run(self, *, dry: bool, backup_location: str | Path | None = None) -> ApplyReport | None:
         texto = self._instruction_text()
         if texto is None:
             return None
@@ -394,7 +416,13 @@ class MainWindow(QMainWindow):
         if instruction is None:
             return None
         root = self.root_edit.text().strip() or None
-        return apply_instruction(instruction, root_path=root, dry_run=dry, color=False)
+        return apply_instruction(
+            instruction,
+            root_path=root,
+            dry_run=dry,
+            backup_location=backup_location,
+            color=False,
+        )
 
     # ── Ações principais (também usadas pelos testes offscreen) ───────────
     def preview(self) -> None:
@@ -468,14 +496,21 @@ class MainWindow(QMainWindow):
                 instruction, root_path=root_usada, dry_run=False, color=False
             )
         else:
-            report = self._run(dry=False)
+            backup_location = self.backup_edit.text().strip() or None
+            report = self._run(dry=False, backup_location=backup_location)
         if report is None:
             return
         self._populate_tree(report)
         if report.ok:
-            ts = Path(report.backup_dir).name if report.backup_dir else None
-            # FIX-007a: o Desfazer usa a raiz capturada AGORA, não o campo futuro.
-            self._last_backup = (root_usada, ts) if ts else None
+            # FIX-007a + F3: captura o parent do session_dir para o rollback usar diretamente,
+            # independente de onde o backup foi criado (interno ou externo).
+            if report.backup_dir:
+                self._last_backup = (
+                    str(Path(report.backup_dir).parent),
+                    Path(report.backup_dir).name,
+                )
+            else:
+                self._last_backup = None
             self.btn_undo.setEnabled(self._last_backup is not None)
             self.btn_apply.setEnabled(False)
             self._set_errors([])
@@ -497,13 +532,13 @@ class MainWindow(QMainWindow):
         """Desfaz a última aplicação desta sessão via rollback por timestamp."""
         if not self._last_backup:
             return
-        root_usada, ts = self._last_backup
+        backup_parent, ts = self._last_backup
         if confirm:
             resp = QMessageBox.question(self, "Desfazer", f"Reverter a aplicação {ts}?")
             if resp != QMessageBox.StandardButton.Yes:
                 return
         try:
-            itens = rollback_session(root_usada, ts)
+            itens = rollback_from_dir(Path(backup_parent) / ts)
         except FileNotFoundError as exc:
             QMessageBox.critical(self, "Desfazer", str(exc))
             return

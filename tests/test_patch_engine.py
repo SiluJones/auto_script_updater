@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from src.core.backup_manager import rollback_session
+from src.core.backup_manager import rollback_from_dir, rollback_session
 from src.core.file_locator import FileLocatorError, resolve_path
 from src.core.patch_engine import apply_instruction
 
@@ -338,7 +338,7 @@ def _replace_file_mod(new_content):
 
 
 def test_backup_location_keeps_project_clean(tmp_path):
-    """--backup-dir cria backups/ fora do projeto; a arvore do projeto fica limpa."""
+    """--backup-dir cria o backup fora do projeto; a arvore do projeto fica limpa."""
     proj = tmp_path / "proj"
     proj.mkdir()
     (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
@@ -349,9 +349,10 @@ def test_backup_location_keeps_project_clean(tmp_path):
     report = apply_instruction(instr, root_path=proj, backup_location=fora, color=False)
     assert report.ok
     assert not (proj / "backups").exists()  # projeto limpo
-    assert (fora / "backups").exists()  # backup foi para fora
-    ts = Path(report.backup_dir).name
-    rollback_session(fora, ts)
+    # Estrutura nova: fora/<project_name>/<ts>  (sem subpasta 'backups')
+    assert Path(report.backup_dir).parent.parent == fora
+    assert Path(report.backup_dir).parent.name == "proj"
+    rollback_from_dir(Path(report.backup_dir))
     assert (proj / "f.txt").read_text(encoding="utf-8") == "antigo\n"
 
 
@@ -372,3 +373,85 @@ def test_history_log_accumulates(tmp_path):
     history = (proj / "backups" / "history.log").read_text(encoding="utf-8")
     assert history.count("\n") == 2
     assert "mudanca 1" in history and "mudanca 2" in history
+
+
+# ── F3: backup externo com project_name (WI-1/WI-2) ──────────────────────────
+
+
+def test_backup_interno_estrutura_atual(tmp_path):
+    """Backup interno (sem backup_location): usa backups/<ts>."""
+    proj = tmp_path / "meu_projeto"
+    proj.mkdir()
+    (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
+    instr = _instr([_txt_file("f.txt", _replace_file_mod("novo\n"))])
+
+    report = apply_instruction(instr, root_path=proj, color=False)
+    assert report.ok
+    session_dir = Path(report.backup_dir)
+    # Estrutura esperada: proj/backups/<ts>
+    assert session_dir.parent.parent == proj
+    assert session_dir.parent.name == "backups"
+
+
+def test_backup_externo_aninha_por_projeto(tmp_path):
+    """Backup externo: usa <ext>/<project_name>/<ts>, sem pasta backups/ no projeto."""
+    proj = tmp_path / "meu_projeto"
+    proj.mkdir()
+    (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
+    ext = tmp_path / "backup_externo"
+    ext.mkdir()
+    instr = _instr([_txt_file("f.txt", _replace_file_mod("novo\n"))])
+
+    report = apply_instruction(instr, root_path=proj, backup_location=ext, color=False)
+    assert report.ok
+    session_dir = Path(report.backup_dir)
+    # Estrutura esperada: ext/meu_projeto/<ts>
+    assert session_dir.parent.parent == ext
+    assert session_dir.parent.name == "meu_projeto"
+    assert not (proj / "backups").exists()
+
+
+def test_backup_externo_history_por_projeto(tmp_path):
+    """history.log fica em <ext>/<project_name>/ (ao lado das sessoes)."""
+    proj = tmp_path / "meu_projeto"
+    proj.mkdir()
+    (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
+    ext = tmp_path / "backup_externo"
+    ext.mkdir()
+    instr = _instr([_txt_file("f.txt", _replace_file_mod("novo\n"))])
+    instr["description"] = "teste history externo"
+
+    apply_instruction(instr, root_path=proj, backup_location=ext, color=False)
+    history = ext / "meu_projeto" / "history.log"
+    assert history.is_file()
+    assert "teste history externo" in history.read_text(encoding="utf-8")
+
+
+def test_rollback_from_dir_backup_interno(tmp_path):
+    """rollback_from_dir funciona com backup interno."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
+    instr = _instr([_txt_file("f.txt", _replace_file_mod("novo\n"))])
+
+    report = apply_instruction(instr, root_path=proj, color=False)
+    assert (proj / "f.txt").read_text(encoding="utf-8") == "novo\n"
+
+    rollback_from_dir(Path(report.backup_dir))
+    assert (proj / "f.txt").read_text(encoding="utf-8") == "antigo\n"
+
+
+def test_rollback_from_dir_backup_externo(tmp_path):
+    """rollback_from_dir funciona com backup externo aninhado por projeto."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
+    ext = tmp_path / "ext"
+    ext.mkdir()
+    instr = _instr([_txt_file("f.txt", _replace_file_mod("novo\n"))])
+
+    report = apply_instruction(instr, root_path=proj, backup_location=ext, color=False)
+    assert (proj / "f.txt").read_text(encoding="utf-8") == "novo\n"
+
+    rollback_from_dir(Path(report.backup_dir))
+    assert (proj / "f.txt").read_text(encoding="utf-8") == "antigo\n"

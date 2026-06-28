@@ -71,14 +71,18 @@ class BackupManager:
     """Cria backups sob um diretório de sessão e restaura sob demanda.
 
     Args:
-        backup_root: onde a pasta ``backups/`` é criada (a raiz do projeto).
+        backup_root: onde os backups são criados (raiz do projeto ou pasta externa).
         root: raiz do projeto, usada para encurtar os espelhos (caminhos
             relativos). Quando ``None``, cai no esquema ``_abs/`` (ver
             :func:`_relative_mirror`). Por padrão, igual a ``backup_root``.
+        project_name: quando fornecido (backup externo), substitui ``backups/``
+            como agrupador: sessão fica em ``<backup_root>/<project_name>/<ts>``
+            e ``history.log`` em ``<backup_root>/<project_name>/``.
     """
 
     backup_root: Path
     root: Path | None = None
+    project_name: str | None = None
     timestamp: str = field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
     _entries: list[_Entry] = field(default_factory=list, init=False)
 
@@ -88,7 +92,9 @@ class BackupManager:
 
     @property
     def session_dir(self) -> Path:
-        """Diretório desta sessão de backup (``backups/<timestamp>/``)."""
+        """Diretório desta sessão de backup."""
+        if self.project_name:
+            return Path(self.backup_root) / self.project_name / self.timestamp
         return Path(self.backup_root) / "backups" / self.timestamp
 
     def register(self, path: Path) -> None:
@@ -129,7 +135,7 @@ class BackupManager:
         return manifest
 
     def append_history(self, description: str = "") -> Path:
-        """Acrescenta uma linha ao log consolidado ``backups/history.log``.
+        """Acrescenta uma linha ao log consolidado ``history.log``.
 
         Um único arquivo que cresce a cada aplicação, em vez de obrigar o usuário
         a abrir cada pasta de timestamp para saber o que aconteceu (ideia do
@@ -137,7 +143,11 @@ class BackupManager:
         complementar ao manifesto por sessão (que continua sendo a fonte para o
         rollback) — aqui é só leitura humana cronológica.
         """
-        backups_dir = Path(self.backup_root) / "backups"
+        # Quando há project_name (backup externo), history.log fica ao lado das sessões.
+        if self.project_name:
+            backups_dir = Path(self.backup_root) / self.project_name
+        else:
+            backups_dir = Path(self.backup_root) / "backups"
         backups_dir.mkdir(parents=True, exist_ok=True)
         history = backups_dir / "history.log"
         n_mod = sum(1 for e in self._entries if e.existed)
@@ -150,10 +160,10 @@ class BackupManager:
         return history
 
 
-def rollback_session(backup_root: Path, timestamp: str) -> list[str]:
-    """Desfaz uma sessão de backup a partir do seu manifesto (CLI ``rollback``).
+def rollback_from_dir(session_dir: Path) -> list[str]:
+    """Desfaz uma sessao de backup dado o caminho completo do diretório de sessao.
 
-    Lê ``backups/<timestamp>/manifest.txt`` e, para cada arquivo: restaura os
+    Lê ``<session_dir>/manifest.txt`` e, para cada arquivo: restaura os
     'modificado' a partir do espelho gravado; remove os 'criado'.
 
     Aceita também o formato ANTIGO de manifesto (``[estado] caminho``), por
@@ -163,9 +173,9 @@ def rollback_session(backup_root: Path, timestamp: str) -> list[str]:
         Lista de descrições do que foi revertido.
 
     Raises:
-        FileNotFoundError: se a sessão/manifesto não existir.
+        FileNotFoundError: se o manifesto não existir.
     """
-    session_dir = Path(backup_root) / "backups" / timestamp
+    session_dir = Path(session_dir)
     manifest = session_dir / "manifest.txt"
     if not manifest.is_file():
         raise FileNotFoundError(f"Manifesto de backup não encontrado: {manifest}")
@@ -200,6 +210,22 @@ def rollback_session(backup_root: Path, timestamp: str) -> list[str]:
                 original.unlink()
                 revertidos.append(f"removido: {original}")
     return revertidos
+
+
+def rollback_session(backup_root: Path, timestamp: str) -> list[str]:
+    """Desfaz uma sessão de backup a partir do seu manifesto (CLI ``rollback``).
+
+    Lê ``backups/<timestamp>/manifest.txt``. Para backup externo com project_name,
+    passe ``<backup_location>/<project_name>`` como ``backup_root``.
+
+    Returns:
+        Lista de descrições do que foi revertido.
+
+    Raises:
+        FileNotFoundError: se a sessão/manifesto não existir.
+    """
+    session_dir = Path(backup_root) / "backups" / timestamp
+    return rollback_from_dir(session_dir)
 
 
 def mirror_path(session_dir: Path, path: Path) -> Path:

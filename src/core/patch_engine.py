@@ -12,6 +12,7 @@ explícitos passados a :func:`apply_instruction`.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -75,6 +76,15 @@ def make_sandbox(root: Path, instruction: Mapping[str, Any]) -> Path:
 # Padrões dos settings (o schema documenta os mesmos defaults, mas jsonschema
 # não os injeta — aplicamos aqui).
 _DEFAULTS = {"backup": True, "dry_run": False, "stop_on_error": True, "encoding": "utf-8"}
+
+# Caracteres inválidos em nomes de pasta no Windows.
+_INVALID_NAME_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def _sanitize_name(name: str) -> str:
+    """Retorna um basename seguro para usar como nome de pasta no Windows."""
+    return _INVALID_NAME_RE.sub("_", name) or "project"
+
 
 # Encodings tentados ao ler arquivos-alvo (Armadilha #3).
 _READ_FALLBACK = ("utf-8", "cp1252")
@@ -234,7 +244,15 @@ def apply_instruction(
     # o MAX_PATH do Windows (FIX-008). O LOCAL do backup pode ser outro (o usuário
     # pode querer a pasta backups/ fora do projeto), por isso são parâmetros
     # distintos: backup_root = onde criar backups/; root = base dos caminhos.
-    backup_mgr = BackupManager(backup_root, root=project_root) if use_backup else None
+    # Quando externo, aninha por projeto: <backup_root>/<project_name>/<ts>.
+    project_name = None
+    if backup_location is not None and backup_root.resolve() != project_root.resolve():
+        project_name = _sanitize_name(project_root.name)
+    backup_mgr = (
+        BackupManager(backup_root, root=project_root, project_name=project_name)
+        if use_backup
+        else None
+    )
 
     report = ApplyReport(ok=True, dry_run=is_dry)
     wrote_anything = False

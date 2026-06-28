@@ -332,3 +332,26 @@ def test_btn_bat_habilitado_com_raiz(app, demo_root):
     assert not win.btn_bat.isEnabled()
     win.root_edit.setText(str(demo_root))
     assert win.btn_bat.isEnabled()
+
+
+# ── F3: campo de backup na GUI ────────────────────────────────────────────────
+
+
+def test_gui_tem_campo_backup(app):
+    """A janela instancia com o campo backup_edit."""
+    win = MainWindow()
+    assert hasattr(win, "backup_edit")
+    assert win.backup_edit.placeholderText() != ""
+
+
+def test_save_and_restore_backup_dir(app, tmp_path):
+    """_save_last_paths / _restore_last_paths incluem o backup-dir."""
+    pasta = str(tmp_path / "meu_backup")
+    win = MainWindow()
+    win.backup_edit.setText(pasta)
+    win._save_last_paths()
+
+    win2 = MainWindow()
+    win2._settings = win._settings  # compartilha o mesmo QSettings
+    win2._restore_last_paths()
+    assert win2.backup_edit.text() == pasta
