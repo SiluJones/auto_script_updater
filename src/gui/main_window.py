@@ -153,6 +153,11 @@ class MainWindow(QMainWindow):
         )
         self.btn_bat.setEnabled(False)
         self.btn_bat.clicked.connect(self._create_launcher_bat)
+        self.btn_gui_bat = QPushButton("Criar atalho .bat (abrir GUI)…")
+        self.btn_gui_bat.setToolTip(
+            "Gera um .bat que abre a GUI sem projeto pré-definido (sem console, qualquer pasta)."
+        )
+        self.btn_gui_bat.clicked.connect(self._create_open_gui_bat)
         # Habilita/desabilita o botão .bat conforme a raiz é preenchida.
         self.root_edit.textChanged.connect(self._on_root_text_changed)
 
@@ -188,6 +193,7 @@ class MainWindow(QMainWindow):
         acoes.addWidget(self.btn_undo)
         acoes.addWidget(self.btn_copy_err)
         acoes.addWidget(self.btn_bat)
+        acoes.addWidget(self.btn_gui_bat)
         self.chk_sandbox = QCheckBox("Aplicar em sandbox (cópia)")
         self.chk_sandbox.setToolTip(
             "Aplica numa CÓPIA do projeto (pasta irmã *_sandbox_<ts>); o original não é tocado."
@@ -565,7 +571,10 @@ class MainWindow(QMainWindow):
         texto = build_launcher_bat(
             asu_home=asu_home, project_root=project_root, bat_dir=destino_path.parent
         )
-        enc = "ascii" if texto.isascii() else "utf-8"
+        # Se build_launcher_bat inseriu chcp (bat_dir acentuado), o texto ainda pode
+        # ser ASCII puro (pasta acentuada nao aparece literal, so %~dp0). Forcamos UTF-8
+        # sempre que o chcp estiver presente, para que o arquivo seja consistente.
+        enc = "utf-8" if ("chcp 65001" in texto or not texto.isascii()) else "ascii"
         try:
             destino_path.write_text(texto, encoding=enc)
         except OSError as exc:
@@ -575,6 +584,42 @@ class MainWindow(QMainWindow):
         enc_nota = " (caminho com acento -- .bat em UTF-8/chcp)" if enc == "utf-8" else ""
         if not venv_python.exists():
             aviso = f"ATENCAO: {venv_python} nao encontrado -- confirme o caminho do venv."
+            QMessageBox.information(
+                self, "Atalho criado (aviso)", f"Atalho salvo em:\n{destino}\n\n{aviso}"
+            )
+            self.statusBar().showMessage(f"Atalho criado: {destino}{enc_nota} -- {aviso}")
+        else:
+            self.statusBar().showMessage(f"Atalho criado: {destino}{enc_nota}")
+
+    def _create_open_gui_bat(self) -> None:
+        """Gera um .bat que abre a GUI sem projeto pre-definido (atalho classico)."""
+        from .launcher import build_open_gui_bat
+
+        asu_home = Path(__file__).resolve().parent.parent.parent
+        venv_pythonw = asu_home / ".venv" / "Scripts" / "pythonw.exe"
+
+        default_dir = asu_home.parent
+        destino, _ = QFileDialog.getSaveFileName(
+            self,
+            "Salvar atalho .bat (abrir GUI)",
+            str(default_dir / "abrir-asu-gui.bat"),
+            "Scripts batch (*.bat)",
+        )
+        if not destino:
+            return
+
+        destino_path = Path(destino)
+        texto = build_open_gui_bat(asu_home=asu_home)
+        enc = "utf-8" if ("chcp 65001" in texto or not texto.isascii()) else "ascii"
+        try:
+            destino_path.write_text(texto, encoding=enc)
+        except OSError as exc:
+            QMessageBox.critical(self, "Criar atalho", f"Nao foi possivel escrever: {exc}")
+            return
+
+        enc_nota = " (caminho com acento -- .bat em UTF-8/chcp)" if enc == "utf-8" else ""
+        if not venv_pythonw.exists():
+            aviso = f"ATENCAO: {venv_pythonw} nao encontrado -- confirme o caminho do venv."
             QMessageBox.information(
                 self, "Atalho criado (aviso)", f"Atalho salvo em:\n{destino}\n\n{aviso}"
             )

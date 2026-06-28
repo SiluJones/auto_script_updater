@@ -46,7 +46,8 @@ def build_launcher_bat(*, asu_home: Path, project_root: Path, bat_dir: Path) -> 
         # project_root fora de bat_dir: caminho absoluto
         root_arg = str(project_root)
 
-    precisa_utf8 = not (str(asu_home).isascii() and root_arg.isascii())
+    # bat_dir eh %~dp0 em runtime; inclui no teste para cobrir acentos na pasta do .bat
+    precisa_utf8 = not (str(asu_home).isascii() and root_arg.isascii() and str(bat_dir).isascii())
     chcp_line = "chcp 65001 >nul\n" if precisa_utf8 else ""
     return (
         "@echo off\n"
@@ -54,6 +55,25 @@ def build_launcher_bat(*, asu_home: Path, project_root: Path, bat_dir: Path) -> 
         + "REM Atalho gerado pelo ASU -- abre a interface ja apontada para este projeto.\n"
         + f'set "ASU_HOME={asu_home}"\n'
         + 'pushd "%ASU_HOME%"\n'
-        + f'".venv\\Scripts\\python.exe" -m src.gui --root "{root_arg}" --instruction-dir "%~dp0"\n'
+        # %~dp0 termina em \; o . evita \" que corrompe o argumento (BUG 1)
+        + '".venv\\Scripts\\python.exe" -m src.gui'
+        + f' --root "{root_arg}" --instruction-dir "%~dp0."\n'
         + "popd\n"
+    )
+
+
+def build_open_gui_bat(*, asu_home: Path) -> str:
+    """Gera um .bat que abre a GUI sem raiz nem instrucao (atalho classico).
+
+    Usa pythonw.exe (sem janela de console) e start /d para definir o diretorio
+    de trabalho de forma robusta, sem depender de projeto especifico.
+    """
+    asu_home = asu_home.resolve()
+    precisa_utf8 = not str(asu_home).isascii()
+    chcp_line = "chcp 65001 >nul\n" if precisa_utf8 else ""
+    return (
+        "@echo off\n"
+        + chcp_line
+        + "REM Atalho gerado pelo ASU -- abre a interface (sem console).\n"
+        + f'start "" /d "{asu_home}" "{asu_home}\\.venv\\Scripts\\pythonw.exe" -m src.gui\n'
     )

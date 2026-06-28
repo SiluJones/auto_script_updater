@@ -5,7 +5,7 @@ Cobre WI-3 da spec F2-acesso-rapido.md.
 
 from __future__ import annotations
 
-from src.gui.launcher import build_launcher_bat, resolve_instruction_in_dir
+from src.gui.launcher import build_launcher_bat, build_open_gui_bat, resolve_instruction_in_dir
 
 # ── resolve_instruction_in_dir ──────────────────────────────────────────────
 
@@ -150,3 +150,65 @@ def test_build_bat_accented_path_has_chcp(tmp_path):
     texto = build_launcher_bat(asu_home=asu_home, project_root=project_root, bat_dir=bat_dir)
     assert "chcp 65001" in texto, "Deve conter 'chcp 65001' para caminho acentuado"
     assert "Café" in texto, "Nome acentuado deve aparecer intacto (nao vira '?')"
+
+
+# ── Testes de correcao de BUG 1/2 e atalho classico (F2-bat-fix.md) ──────────
+
+
+def test_build_bat_instruction_dir_has_dot(tmp_path):
+    """BUG 1: --instruction-dir deve terminar com %~dp0. (ponto) e nao %~dp0\"."""
+    bat_dir = tmp_path / "bat"
+    bat_dir.mkdir()
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    asu = tmp_path / "asu"
+    asu.mkdir()
+
+    texto = build_launcher_bat(asu_home=asu, project_root=proj, bat_dir=bat_dir)
+    assert '--instruction-dir "%~dp0."' in texto, 'Deve conter --instruction-dir "%~dp0."'
+    # Garante que a sequencia problematica nao aparece
+    assert '%~dp0"' not in texto.replace('%~dp0."', ""), 'Sequencia %~dp0" nao deve aparecer'
+
+
+def test_build_bat_accented_bat_dir_has_chcp(tmp_path):
+    """BUG 2: bat_dir acentuado (%~dp0 em runtime) deve gerar chcp 65001."""
+    bat_dir = tmp_path / "Área"
+    bat_dir.mkdir()
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    asu = tmp_path / "asu"
+    asu.mkdir()
+
+    texto = build_launcher_bat(asu_home=asu, project_root=proj, bat_dir=bat_dir)
+    assert "chcp 65001" in texto, "bat_dir acentuado deve gerar chcp 65001"
+
+
+def test_build_open_gui_bat_basic(tmp_path):
+    """Atalho classico: contem pythonw.exe e start /d; sem --root nem --instruction-dir."""
+    asu = tmp_path / "asu"
+    asu.mkdir()
+
+    texto = build_open_gui_bat(asu_home=asu)
+    assert "pythonw.exe" in texto
+    assert 'start "" /d' in texto
+    assert "--root" not in texto
+    assert "--instruction-dir" not in texto
+
+
+def test_build_open_gui_bat_ascii_no_chcp(tmp_path):
+    """asu_home ASCII: texto ASCII puro, sem chcp."""
+    asu = tmp_path / "asu"
+    asu.mkdir()
+
+    texto = build_open_gui_bat(asu_home=asu)
+    assert texto.isascii(), "Deve ser ASCII puro para asu_home sem acento"
+    assert "chcp" not in texto
+
+
+def test_build_open_gui_bat_accented_has_chcp(tmp_path):
+    """asu_home acentuado: texto contem chcp 65001."""
+    asu = tmp_path / "Área de Trabalho" / "asu"
+    asu.mkdir(parents=True)
+
+    texto = build_open_gui_bat(asu_home=asu)
+    assert "chcp 65001" in texto
