@@ -3,9 +3,17 @@
 > Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/) e versionamento [SemVer](https://semver.org/lang/pt-BR/).
 > **Cresce**: entradas novas no topo. Registra só o que foi de fato concluído/entregue.
 
-## [Não lançado]
-### A fazer
-- **Padrão do backup na pasta-pai da raiz (DEC-024c):** mudar o local PADRÃO do backup de `root/backups/` para `parent(root)/backups/<ts>/` (fora do repo por padrão). Ajustar o `rollback` sem `--backup-dir` para procurar no mesmo padrão. *(decidido, ainda não implementado)*
+## [0.8.1] — 2026-06-28
+### Adicionado
+- **Backup padrão na pasta-pai da raiz — DEC-024(c):** sem `--backup-dir`, o backup vai para `parent(root)/backups/<timestamp>/` em vez de `root/backups/`. Projeto fica limpo por padrão. Edge: `root` sem pai utilizável (drive root) → fallback para `root/backups/` (seguro). NÃO aninha por `<rootname>` no padrão (colidiria com a própria raiz).
+
+### Corrigido / Ajustado
+- **Rollback default acompanha o padrão:** `rollback` sem `--backup-dir` procura em `parent(root)` (antes: `root`). CLI e GUI coerentes.
+- **`self-test` usa `rollback_from_dir(path)`** em vez de `rollback_session(raiz, ts)` — agnóstico à localização do backup, independentemente de interno ou externo.
+
+### Qualidade
+- Testes: 126 → **128** (2 novos: `test_backup_padrao_rollback_via_cli`, `test_backup_externo_nao_regride_dec024b`); `test_backup_interno_estrutura_atual` → `test_backup_padrao_pasta_pai`; ruff/black limpos.
+- `__version__` bumpeado para `0.8.1`.
 
 ---
 

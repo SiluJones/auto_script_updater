@@ -79,7 +79,7 @@
 - [ ] Modo comparação acumulada pós-aplicação (diff de todos os arquivos numa tela).
 - [→] Gerador de `.bat` por projeto — **movido para a F2** (increment "Acesso rápido", spec `meta/specs/F2-acesso-rapido.md`), por estar acoplado aos args de lançamento e às pastas recentes que o usuário pediu junto.
 - [ ] Botão/flag para copiar a SAÍDA completa (não só erro), inclusive em sucesso — ver IDEAS.
-- [~] Backup configurável: `--backup-dir` (fora do projeto) e `history.log` ENTREGUES (DEC-018); **exposto na GUI + aninhado por projeto quando externo + `rollback_from_dir` ENTREGUES (2026-06-28, 0.8.0, DEC-024 a/b)**. PENDENTE: **tornar o PADRÃO a pasta-PAI da raiz** (DEC-024c — fora do repo por padrão; cuidado de colisão `parent/<rootname>`=raiz e do rollback default) e limpeza automática de backups antigos (manter últimos N/X dias).
+- [x] Backup configurável: `--backup-dir` + `history.log` (DEC-018); exposto na GUI + aninhado por projeto quando externo + `rollback_from_dir` (DEC-024 a/b, 0.8.0); **padrão `parent(root)/backups/<ts>` (DEC-024c, 0.8.1)**. PENDENTE: limpeza automática de backups antigos (manter últimos N/X dias).
 - [ ] Packaging PyInstaller como `.exe` standalone Windows (UPX para compressão).
 - [ ] README de usuário final com capturas de tela e guia de início rápido.
 

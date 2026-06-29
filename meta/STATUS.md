@@ -7,13 +7,9 @@
 ---
 
 ## Versão Atual
-**[0.8.0]** — 2026-06-28 — **Launcher e backup na GUI.** (1) Atalho "abrir GUI" clássico (`pythonw`+`start /d`, sem console — DEC-023); (2) campo "Backup:" na GUI expondo `--backup-dir`, com aninhamento por projeto quando externo (DEC-024 a/b); (3) **correção do `.bat` por projeto** (`--instruction-dir "%~dp0."` — o `%~dp0` cru quebrava o argumento) + `chcp` ciente da pasta do `.bat` + endurecimento de encoding ASCII/UTF-8 do `.bat` (DEC-023). **126 testes verdes; ruff/black limpos.** Implementado pelo Claude Code (relatórios 06-28); o `/wrap` registra os docs (este STATUS, CHANGELOG, DECISIONS já refletem).
+**[0.8.1]** — 2026-06-28 — **Backup padrão na pasta-pai da raiz (DEC-024c).** Sem `--backup-dir`, o backup vai para `parent(root)/backups/<ts>/` (fora do repo). Rollback default acompanha. Edge: drive root → fallback para dentro do projeto. `__version__` = 0.8.1. **128 testes verdes; ruff/black limpos; self-test OK.**
 
-> **⚠️ Pendência de sincronia de versão:** o código foi implementado mas o `/wrap` do Claude Code (bump de `__version__`, CHANGELOG no repo) pode não ter sido concluído quando este pacote foi gerado. Os docs de contexto aqui já estão em 0.8.0 — alinhe o `__version__`/CHANGELOG do repo a eles (ver "Instruções para o Claude Code" no fim, se aplicável). A divergência 97/112/107 entre relatórios foi resolvida: contagem definitiva é **126**.
-
-> **Próxima tarefa de código:** **padrão do backup na pasta-PAI da raiz** (DEC-024c) — hoje o padrão é dentro do projeto; o usuário quer fora por padrão. Cuidado: NÃO aninhar `<rootname>` no caso padrão (colidiria com a raiz); usar `parent(root)/backups/<ts>`; e o `rollback` sem `--backup-dir` precisa procurar no mesmo padrão novo.
-
-> **Anterior:** [0.7.0] — 2026-06-23 — F2 increment "Acesso rápido" (recentes/fixadas + args + gerador de .bat + resolução pasta→instrução; 112 testes). [0.6.0] — 2026-06-15 — conveniências de backup + sandbox na GUI (93 testes).
+> **Anterior:** [0.8.0] — 2026-06-28 — Launcher e backup na GUI (DEC-023/024 a/b, 126 testes). [0.7.0] — 2026-06-23 — F2 acesso rápido (112 testes). [0.6.0] — 2026-06-15 — backup configurável + sandbox na GUI (93 testes).
 
 > **Nota:** as sessões 06-19 e 06-21 não tocaram o CÓDIGO; foram mudanças de PROCESSO/estrutura (modo Claude Code).
 
@@ -51,17 +47,15 @@ Este repo agora integra o toolchain **KCM · ASU · FlatDrop**, coordenado por *
 - **JSON com roundtrip fiel** (FIX-004): indentação/compacto/newline final do original preservados; chaves `null` deletáveis (FIX-005).
 - **GUI (F2)** (`python -m src.gui`): Pré-visualizar (dry-run) com árvore 🟢/🔴/⚪ por arquivo e ✓/✗ por modificação + diff colorido; Aplicar com backup; Desfazer; Colar instrução (clipboard); Copiar erro para a IA; caminhos lembrados (QSettings); **checkbox de sandbox** (DEC-019). **Acesso rápido (0.7.0, DEC-022):** menu "Recentes ▾" (até 8) + botão 📌 fixar ao lado da Raiz; aceita args de lançamento (`--root`/`--instruction-dir`/`--instruction`); botão "Criar atalho .bat…" (por projeto). **0.8.0:** campo "Backup:" (expõe `--backup-dir`, DEC-024) + botão "Criar atalho .bat (abrir GUI)…" (clássico, DEC-023). Estado entre prévia/aplicação/desfazer protegido por fingerprint SHA-256 e raiz capturada (FIX-007).
 - **Atalhos `.bat` (DEC-022/023):** módulo puro `src/gui/launcher.py` — `build_launcher_bat` (por projeto: `.venv\Scripts\python.exe` direto, `--root` relativo/absoluto, `--instruction-dir "%~dp0."`, `chcp`+UTF-8 quando algum caminho tem acento), `build_open_gui_bat` (clássico: `pythonw`+`start /d`, sem console) e `resolve_instruction_in_dir` (escaneia só o topo da pasta: 1 yaml=pré-preenche, 2+=abre seletor). NUNCA auto-aplica — só pré-preenche.
-- **Backup (DEC-006/018/024):** obrigatório, timestampado, rollback atômico (automático em falha + manual por timestamp). Espelho relativo à raiz (FIX-008, não estoura MAX_PATH). `--backup-dir` mantém o backup fora do projeto; quando externo, aninha `<dir>/<nome-da-raiz>/<ts>/` (DEC-024b). `rollback_from_dir(session_dir)` aceita o caminho da sessão (funciona p/ interno e externo). `manifest.txt` (`estado<TAB>original<TAB>espelho`) é a fonte do rollback; `history.log` consolidado por pasta de backup.
-- **126 testes** unitários e de integração, todos verdes; `ruff` e `black` limpos. (Era 93 em 0.6.0, 112 em 0.7.0; subiu para 126 em 0.8.0 com as specs F2-bat + F3.)
+- **Backup (DEC-006/018/024):** obrigatório, timestampado, rollback atômico (automático em falha + manual por timestamp). Espelho relativo à raiz (FIX-008, não estoura MAX_PATH). **Padrão (DEC-024c):** `parent(root)/backups/<ts>/` — fora do repo. `--backup-dir` explícito: pasta escolhida; quando externo, aninha `<dir>/<nome-da-raiz>/<ts>/` (DEC-024b). `rollback_from_dir(session_dir)` aceita o caminho completo da sessão. `manifest.txt` (`estado<TAB>original<TAB>espelho`) é a fonte do rollback; `history.log` consolidado.
+- **128 testes** unitários e de integração, todos verdes; `ruff` e `black` limpos. (Era 93 em 0.6.0, 112 em 0.7.0, 126 em 0.8.0, 128 em 0.8.1.)
 - **`apply --sandbox`** / checkbox de sandbox: aplica numa cópia irmã do projeto; original intocado (DEC-015, DEC-019). `SandboxError` quando a instrução é `path_mode=absolute`.
 - **`python -m src self-test`**: valida a instalação ponta a ponta em tempdir (nada do disco é tocado).
 - Núcleo com 4 dependências (PyYAML, jsonschema, libcst, colorama). GUI adiciona PySide6; dev adiciona pytest, pytest-qt, ruff, black.
 
 ## 🔧 Em Progresso
-- **▶ Próxima tarefa de código — backup padrão na pasta-PAI da raiz (DEC-024c):** tornar o PADRÃO do backup `parent(root)/backups/<ts>/` (fora do repo), em vez de dentro do projeto. Cuidado de design: NÃO aninhar `<rootname>` no caso padrão (colide com a raiz); `rollback` sem `--backup-dir` deve procurar no mesmo padrão; edge de raiz sem pai → cair para dentro. Precisa de spec curta + fechar a DEC-024(c).
 - **F2 (GUI) — itens estruturais restantes:** validação VISUAL no Windows segue pendente (o usuário rodou a GUI e confirmou que os botões/atalhos e o campo Backup aparecem — ver screenshot 06-28 — mas falta uso prolongado); highlight de sintaxe no diff; barra de progresso; tema claro/escuro; seleção de timestamps antigos no Desfazer.
-- **Pendência de documentação (herdada):** README e GUIA_PASSO_A_PASSO ainda NÃO atualizados (features 0.6.0 + 0.7.0 + 0.8.0). Código e docs de contexto estão atualizados; README/GUIA ficaram para depois.
-- **`/wrap` do 0.8.0 no repo:** o Claude Code implementou o código mas deixou o registro de docs para o `/wrap` (CHANGELOG/STATUS/DEC/bump). Estes docs de contexto já estão em 0.8.0 — falta alinhar o repo (ver instruções no fim).
+- **Pendência de documentação (herdada):** README e GUIA_PASSO_A_PASSO ainda NÃO atualizados (features 0.6.0 + 0.7.0 + 0.8.x). Código e docs de contexto estão atualizados; README/GUIA ficaram para depois.
 
 ## ❌ Quebrado / Com Problema
 - Nenhum conhecido. (Os 5 bugs reportados nos consoles 06-13 e 06-14 — FIX-008 e FIX-009 — estão corrigidos e confirmados.)
@@ -77,6 +71,7 @@ Este repo agora integra o toolchain **KCM · ASU · FlatDrop**, coordenado por *
 - [x] **▶ Spec `meta/specs/F2-acesso-rapido.md` implementada (2026-06-23):** recentes/fixadas + args + gerador de .bat + resolução pasta→instrução. (0.7.0, 112 testes.)
 - [x] **Specs `F2-bat-ascii.md`, `F2-bat-fix-e-launcher-classico.md`, `F3-backup-na-gui.md` implementadas (2026-06-28):** endurecimento ASCII do .bat, correção do `%~dp0`, atalho clássico "abrir GUI", backup-dir na GUI + nome por projeto. (0.8.0, 126 testes — DEC-023/024.)
 - [x] **Política new-file→download decidida (DEC-025):** ASU edita; arquivo novo entrega-se para baixar (exceto bundle). Mensagem ao KCM preparada (`kcm/mensagem-para-o-KCM-uso-do-ASU.md`).
+- [x] **Spec `F3-backup-padrao-pai.md` implementada (2026-06-28):** backup padrão em `parent(root)/backups/<ts>/`; rollback default acompanha; edge drive-root → fallback; `__version__` 0.8.1. (DEC-024c, 128 testes.)
 - [ ] **Levar a mensagem ao chat do KCM** — reescrever a diretriz «Saída de código via ASU» (editar→ASU, novo→baixar), levar gatilho de ASU para a instrução curta do painel, ancorar no `format_version >= 1.0`. (O usuário fará no chat do KCM.)
 - [ ] **Arquivar os `.txt` já processados:** `260619-ideias.txt`, `260621-Sugestões do KCM`, `260624-2227-code.txt`, `260628-0737.txt`, `260628-1717-code.txt`, `260628-1726-code.txt`, e os `Demostração-*` (todos capturados). Sair do Projeto/raiz quando conveniente.
 - [ ] **Testar o kit v2 em campo**: substituir guia/prompt no(s) projeto(s) consumidor(es), gerar 2–3 instruções reais — e usar sandbox no primeiro projeto médio.
