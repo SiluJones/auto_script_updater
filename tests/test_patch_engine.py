@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from src.core.backup_manager import rollback_from_dir, rollback_session
+from src.core.backup_manager import rollback_from_dir
 from src.core.file_locator import FileLocatorError, resolve_path
 from src.core.patch_engine import apply_instruction
 
@@ -107,7 +107,8 @@ def test_apply_writes_and_backs_up(tmp_path):
     assert report.ok
     assert "return 99" in f.read_text(encoding="utf-8")
     assert report.backup_dir is not None
-    assert (tmp_path / "backups").exists()
+    # DEC-024c: padrão é parent(root)/backups/<ts>
+    assert Path(report.backup_dir).parent.parent == tmp_path.parent
 
 
 def test_create_file_makes_dirs(tmp_path):
@@ -245,8 +246,8 @@ def test_rollback_session_roundtrip(tmp_path):
     report = apply_instruction(instr, root_path=tmp_path, color=False)
     assert json.loads(f.read_text(encoding="utf-8"))["v"] == 2
 
-    ts = report.backup_dir.split("/")[-1].split("\\")[-1]
-    rollback_session(tmp_path, ts)
+    # DEC-024c: backup em parent(root)/backups/<ts>; rollback_from_dir usa o path direto.
+    rollback_from_dir(Path(report.backup_dir))
     assert json.loads(f.read_text(encoding="utf-8"))["v"] == 1
 
 
@@ -370,7 +371,8 @@ def test_history_log_accumulates(tmp_path):
         time.sleep(1.05)  # timestamps distintos (pasta por segundo)
         apply_instruction(instr, root_path=proj, color=False)
 
-    history = (proj / "backups" / "history.log").read_text(encoding="utf-8")
+    # DEC-024c: padrão é parent(proj)/backups/history.log
+    history = (tmp_path / "backups" / "history.log").read_text(encoding="utf-8")
     assert history.count("\n") == 2
     assert "mudanca 1" in history and "mudanca 2" in history
 
@@ -378,8 +380,8 @@ def test_history_log_accumulates(tmp_path):
 # ── F3: backup externo com project_name (WI-1/WI-2) ──────────────────────────
 
 
-def test_backup_interno_estrutura_atual(tmp_path):
-    """Backup interno (sem backup_location): usa backups/<ts>."""
+def test_backup_padrao_pasta_pai(tmp_path):
+    """Padrão DEC-024c: sem backup_location o backup vai para parent(root)/backups/<ts>."""
     proj = tmp_path / "meu_projeto"
     proj.mkdir()
     (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
@@ -388,9 +390,10 @@ def test_backup_interno_estrutura_atual(tmp_path):
     report = apply_instruction(instr, root_path=proj, color=False)
     assert report.ok
     session_dir = Path(report.backup_dir)
-    # Estrutura esperada: proj/backups/<ts>
-    assert session_dir.parent.parent == proj
+    # Estrutura esperada: tmp_path/backups/<ts>  (parent do proj, sem aninhar por nome)
+    assert session_dir.parent.parent == tmp_path
     assert session_dir.parent.name == "backups"
+    assert not (proj / "backups").exists()  # projeto limpo
 
 
 def test_backup_externo_aninha_por_projeto(tmp_path):
@@ -455,3 +458,50 @@ def test_rollback_from_dir_backup_externo(tmp_path):
 
     rollback_from_dir(Path(report.backup_dir))
     assert (proj / "f.txt").read_text(encoding="utf-8") == "antigo\n"
+
+
+# ── DEC-024c: padrão backup na pasta-pai ─────────────────────────────────────
+
+
+def test_backup_padrao_rollback_via_cli(tmp_path):
+    """rollback default (sem --backup-dir) acha o backup em parent(root)/backups."""
+    from src.__main__ import main
+
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
+    instr = _instr([_txt_file("f.txt", _replace_file_mod("novo\n"))])
+    instr_path = tmp_path / "i.yaml"
+    import yaml
+
+    instr_path.write_text(yaml.dump(instr), encoding="utf-8")
+
+    rc = main(["apply", str(instr_path), "--root", str(proj), "--yes", "--no-color"])
+    assert rc == 0
+    assert (proj / "f.txt").read_text(encoding="utf-8") == "novo\n"
+    # Backup em parent(proj)/backups/<ts>
+    backups = [p for p in (tmp_path / "backups").iterdir() if p.is_dir()]
+    assert len(backups) == 1
+    ts = backups[0].name
+
+    rc2 = main(["rollback", ts, "--root", str(proj)])
+    assert rc2 == 0
+    assert (proj / "f.txt").read_text(encoding="utf-8") == "antigo\n"
+
+
+def test_backup_externo_nao_regride_dec024b(tmp_path):
+    """--backup-dir explicito ainda aninha por projeto (DEC-024b nao regride)."""
+    proj = tmp_path / "meu_proj"
+    proj.mkdir()
+    (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
+    ext = tmp_path / "backups_compartilhados"
+    ext.mkdir()
+    instr = _instr([_txt_file("f.txt", _replace_file_mod("novo\n"))])
+
+    report = apply_instruction(instr, root_path=proj, backup_location=ext, color=False)
+    assert report.ok
+    session_dir = Path(report.backup_dir)
+    # Estrutura esperada: ext/meu_proj/<ts>  (aninha por projeto quando externo)
+    assert session_dir.parent.parent == ext
+    assert session_dir.parent.name == "meu_proj"
+    assert not (proj / "backups").exists()

@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 from .core import diff_renderer  # noqa: F401 (mantém o pacote coeso)
-from .core.backup_manager import rollback_session
+from .core.backup_manager import rollback_from_dir, rollback_session
 from .core.instruction_parser import InstructionParseError, load_instruction
 from .core.instruction_validator import InstructionValidationError, validate
 from .core.patch_engine import ApplyReport, apply_instruction
@@ -192,11 +192,10 @@ def _cmd_self_test(args: argparse.Namespace) -> int:
                 if '"2.0.0"' not in cfg:
                     falhas.append("set_json_path não atualizou a versão")
 
-            ts = Path(report.backup_dir).name if report.backup_dir else None
-            if not ts:
+            if not report.backup_dir:
                 falhas.append("backup não foi criado")
             else:
-                rollback_session(raiz, ts)
+                rollback_from_dir(Path(report.backup_dir))
                 calc2 = (raiz / "src" / "calculator.py").read_text(encoding="utf-8")
                 if "Divisão por zero" in calc2:
                     falhas.append("rollback não restaurou calculator.py")
@@ -214,9 +213,13 @@ def _cmd_self_test(args: argparse.Namespace) -> int:
 
 
 def _cmd_rollback(args: argparse.Namespace) -> int:
-    # A pasta backups/ pode ter sido criada fora do projeto (apply --backup-dir).
-    # Prioriza --backup-dir; senão usa --root; senão o diretório atual.
-    base = getattr(args, "backup_dir", None) or args.root or str(Path.cwd())
+    # Prioriza --backup-dir explícito. Sem ele, o padrão DEC-024c é parent(root).
+    if getattr(args, "backup_dir", None):
+        base = args.backup_dir
+    else:
+        root = Path(args.root or Path.cwd()).resolve()
+        par = root.parent
+        base = str(par if par != root else root)
     try:
         revertidos = rollback_session(base, args.timestamp)
     except FileNotFoundError as exc:
@@ -252,8 +255,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_app.add_argument(
         "--backup-dir",
         metavar="PASTA",
-        help="Onde criar a pasta backups/ (padrão: a raiz do projeto). Útil para "
-        "manter o backup fora do projeto.",
+        help="Onde criar a pasta backups/ (padrão: pasta-pai da raiz, fora do projeto). "
+        "Útil para apontar para uma pasta compartilhada de backups.",
     )
     p_app.add_argument(
         "--sandbox",

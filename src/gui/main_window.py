@@ -135,7 +135,7 @@ class MainWindow(QMainWindow):
         # ── Linha 3: pasta de backup ─────────────────────────────────────────
         self.backup_edit = QLineEdit()
         self.backup_edit.setPlaceholderText(
-            "Padrão: pasta do projeto. Opcional: pasta fora do projeto."
+            "Padrão: pasta-pai da raiz (fora do projeto). Opcional: outra pasta."
         )
         btn_backup = QPushButton("Escolher…")
         btn_backup.clicked.connect(self._pick_backup_dir)

@@ -225,9 +225,10 @@ def apply_instruction(
     A instrução deve ter passado por ``instruction_validator.validate`` antes.
 
     Args:
-        backup_location: onde criar a pasta ``backups/``. Por padrão é a raiz do
-            projeto (``root_path``). O usuário pode apontar para fora do projeto
-            (ex.: uma pasta irmã), mantendo a árvore do projeto limpa.
+        backup_location: onde criar a pasta ``backups/``. Por padrão é a pasta-pai
+            da raiz do projeto (DEC-024c); se a raiz não tiver pai utilizável
+            (drive root), cai para dentro do projeto. O usuário pode apontar para
+            qualquer pasta externa, mantendo a árvore do projeto limpa.
     """
     settings = _effective_settings(
         instruction,
@@ -239,15 +240,24 @@ def apply_instruction(
     default_encoding = settings["encoding"]
 
     project_root = Path(root_path) if root_path is not None else Path.cwd()
-    backup_root = Path(backup_location) if backup_location is not None else project_root
     # A raiz do PROJETO encurta os espelhos (caminhos relativos) — evita estourar
-    # o MAX_PATH do Windows (FIX-008). O LOCAL do backup pode ser outro (o usuário
-    # pode querer a pasta backups/ fora do projeto), por isso são parâmetros
-    # distintos: backup_root = onde criar backups/; root = base dos caminhos.
-    # Quando externo, aninha por projeto: <backup_root>/<project_name>/<ts>.
-    project_name = None
-    if backup_location is not None and backup_root.resolve() != project_root.resolve():
-        project_name = _sanitize_name(project_root.name)
+    # o MAX_PATH do Windows (FIX-008). O LOCAL do backup pode ser outro; por isso
+    # são parâmetros distintos: backup_root = onde criar backups/; root = base dos
+    # caminhos relativos.
+    if backup_location is not None:
+        backup_root = Path(backup_location)
+        # Quando o usuário aponta --backup-dir externo, aninha por projeto (DEC-024b).
+        project_name = (
+            _sanitize_name(project_root.name)
+            if backup_root.resolve() != project_root.resolve()
+            else None
+        )
+    else:
+        # Padrão DEC-024c: pasta-pai da raiz, fora do repo.
+        # Sem aninhar por <rootname> (parent/<rootname> = a própria raiz → colide).
+        _par = project_root.resolve().parent
+        backup_root = _par if _par != project_root.resolve() else project_root
+        project_name = None
     backup_mgr = (
         BackupManager(backup_root, root=project_root, project_name=project_name)
         if use_backup
