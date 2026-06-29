@@ -73,7 +73,13 @@
 
 - **`backups/history.log`** — (DEC-018) Arquivo append-only, um por pasta de backups, com uma linha por aplicação: `timestamp<TAB>N modificado(s), N criado(s)  descrição`. Leitura humana cronológica; complementar ao manifesto (não substitui, não é fonte de rollback).
 
-- **`--backup-dir PASTA`** — (DEC-018) Flag do `apply`/`rollback` que define ONDE criar a pasta `backups/` (padrão: a raiz do projeto). Permite manter o backup fora do projeto.
+- **`--backup-dir PASTA`** — (DEC-018) Flag do `apply`/`rollback` que define ONDE criar a pasta `backups/` (padrão: a raiz do projeto). Permite manter o backup fora do projeto. Exposto na GUI no campo "Backup:" (DEC-024). Quando aponta para fora da raiz, o backup é aninhado por projeto: `<dir>/<nome-da-raiz>/<timestamp>/` (DEC-024b). **Padrão migrando para a pasta-PAI da raiz — DEC-024c, a implementar.**
+
+- **`launcher.py` (gui)** — Módulo PURO (sem Qt), testável isoladamente, com as funções dos atalhos `.bat`: `resolve_instruction_in_dir` (escaneia só o TOPO de uma pasta atrás de YAMLs → `one`/`none`/`many`, ignorando subpastas), `build_launcher_bat` (gera o `.bat` por projeto: python do venv direto, `--root` relativo/absoluto, `--instruction-dir "%~dp0."`, `chcp 65001`+UTF-8 quando algum caminho tem acento) e `build_open_gui_bat` (gera o `.bat` clássico "abrir GUI": `pythonw`+`start "" /d`, sem console). DEC-022/023.
+
+- **`rollback_from_dir(session_dir)`** — (DEC-024) Função do `backup_manager` que reverte a partir do CAMINHO COMPLETO de uma pasta de sessão de backup (lê o `manifest.txt` dela). `rollback_session(timestamp)` delega a ela. Faz o desfazer funcionar igual para backup interno (`root/backups/<ts>`) e externo (`<dir>/<projeto>/<ts>`); a GUI guarda `(pai_do_session_dir, ts)` em `_last_backup`.
+
+- **`_sanitize_name`** — (DEC-024) Helper do `patch_engine` que transforma o basename da raiz num nome de pasta Windows válido, usado como `<project_name>` no aninhamento do backup externo.
 
 - **Sandbox / `*_sandbox_<timestamp>/`** — (DEC-015/019) Cópia irmã do projeto criada por `apply --sandbox` (CLI) ou pelo checkbox da GUI, via `patch_engine.make_sandbox`. A instrução é aplicada na cópia; o original não é tocado. Ignora `.git`, `node_modules`, venvs, `backups/`, caches (`SANDBOX_IGNORES`).
 

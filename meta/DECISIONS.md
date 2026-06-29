@@ -636,3 +636,60 @@ O usuário trabalha em vários projetos que consomem o ASU e quer reduzir o atri
 - `python -m src.gui` deixa de ser argumento-zero — `__main__.py` passa a ter uma camada de CLI fina (mais um ponto a manter, trivial).
 - As funções puras (`build_launcher_bat`, `resolve_instruction_in_dir`) são testáveis sem Qt — o grosso da cobertura desta feature mora nelas.
 - O gerador de `.bat` saiu da F3 e entrou na F2 (acoplado aos args e às recentes); registrado no ROADMAP.
+
+---
+
+## DEC-023 — Launcher `.bat`: encoding ASCII/UTF-8, correção do `%~dp0` final, `chcp` ciente da pasta do `.bat`, e atalho "abrir GUI" clássico
+**Data:** 2026-06-28 · **Status:** aceita (implementada) · **Origem:** aprendizado de campo (`.bat` em ASCII puro) + bug observado (`abrir-asu-fileview.bat` não abria apontado). Specas: `meta/specs/F2-bat-ascii.md`, `meta/specs/F2-bat-fix-e-launcher-classico.md`.
+
+### Contexto
+O gerador de `.bat` da DEC-022 (0.7.0) tinha três problemas que só apareceram no uso real no Windows.
+
+### Decisão
+1. **Encoding do `.bat`:** caminhos ASCII → `.bat` 100% ASCII (sem BOM, sem `chcp`). Algum caminho com não-ASCII (comum no Windows pt-BR: `Área de Trabalho`, `Café`) → prefixa `chcp 65001 >nul` e grava o arquivo em **UTF-8 SEM BOM** (o `"utf-8"` do Python não emite BOM; `"utf-8-sig"` é proibido — o CMD trata o BOM como parte do 1º comando). **Nunca** usar `errors="replace"` ao gravar (mascararia a corrupção de um caminho acentuado, virando `?`).
+2. **BUG do `%~dp0` final (corrigido):** `%~dp0` SEMPRE termina em `\`, então `--instruction-dir "%~dp0"` virava `"...\"` e a sequência `\"` é lida pela análise de linha de comando do C runtime (que o Python usa) como **aspa escapada** → argumento corrompido → a resolução pasta→instrução falhava (e a GUI podia nem abrir apontada). Correção: emitir `--instruction-dir "%~dp0."` (o ponto evita o `\"`; `Path("...\\.")` resolve para a mesma pasta). O `--root "%~dp0fileview"` não sofria (não termina em `\`).
+3. **`chcp` ciente da pasta do `.bat`:** como `%~dp0` resolve para a pasta do `.bat` (`bat_dir`) em runtime, o teste `precisa_utf8` passou a incluir `str(bat_dir).isascii()` — senão um `.bat` numa pasta acentuada nasceria ASCII (sem `chcp`) e o CMD lidaria mal com o `%~dp0` acentuado.
+4. **Atalho "abrir GUI" (clássico):** novo botão "Criar atalho .bat (abrir GUI)…" + função pura `build_open_gui_bat`, gerando um `.bat` que SÓ abre a interface (sem `--root`/`--instruction`). Usa `pythonw.exe` do venv + `start "" /d "<asu_home>"` — **sem janela de console** e destacado do terminal, com o diretório de trabalho correto para `src` ser importável. Independente de projeto: o usuário salva onde quiser (Área de Trabalho, pasta `launcher`, etc.). Ideia trazida do `flatdrop-ui.bat` do FlatDrop.
+
+### Consequências
+- Os dois `.bat` do usuário (`abrir-asu-fileview.bat` com `%~dp0.` e `abrir-asu-gui.bat` clássico) passaram a funcionar.
+- Cobertura: testes puros em `tests/test_launcher.py` travam o `%~dp0.` (BUG 1), o `chcp` por `bat_dir` (BUG 2), o atalho clássico (`pythonw`/`start /d`, sem `--root`) e a invariante "ASCII quando os caminhos são ASCII".
+- Implementado pelo Claude Code (relatórios 06-28); entra no CHANGELOG 0.8.0.
+
+---
+
+## DEC-024 — Backup pela GUI, aninhamento por projeto quando externo, e PADRÃO na pasta-pai da raiz
+**Data:** 2026-06-28 · **Status:** parcial — (a) e (b) implementadas; (c) ACEITA, a implementar · **Origem:** pedidos do usuário (260628: backup fora do repo; nome por projeto; e — fim da sessão — tornar o padrão a pasta-pai). Spec: `meta/specs/F3-backup-na-gui.md` (cobre (a)+(b); (c) precisa de uma spec curta de seguimento).
+
+### Contexto
+O núcleo já fazia backup fora do projeto via `backup_location`/`--backup-dir` (DEC-018), mas a GUI não expunha isso, e o backup nascia como `backups/<timestamp>/` — genérico, misturando projetos quando vários mandam para a mesma pasta externa. No fim da sessão o usuário pediu mais: que o PADRÃO do ASU seja gerar o backup numa pasta ANTES da raiz (fora do repo), não dentro.
+
+### Decisão
+- **(a) Expor backup-dir na GUI [implementado]:** linha "Backup:" com `QLineEdit` + "Escolher…" (`_pick_backup_dir`), persistida no `QSettings` (`last_backup_dir`); `apply_changes` passa `backup_location`. Vazio = padrão; preenchido = pasta escolhida.
+- **(b) Nome por projeto quando externo [implementado]:** quando o backup vai para fora da raiz, aninhar `<backup_location>/<project_name>/<timestamp>/` (e o `history.log` em `<backup_location>/<project_name>/`). `project_name` = basename da raiz sanitizado (`_sanitize_name`, nome de pasta Windows válido). A lógica de rollback foi extraída para `rollback_from_dir(session_dir)` (aceita o caminho completo da sessão), e `_last_backup` na GUI guarda `(pai_do_session_dir, ts)` → funciona com backup interno e externo. Dentro do projeto, mantém `backups/<timestamp>` (sem aninhar; nome do projeto seria redundante e alongaria caminhos — MAX_PATH/FIX-008).
+- **(c) PADRÃO na pasta-pai da raiz [a implementar]:** o padrão do backup passa a ser `parent(root)/backups/<timestamp>/`, não `root/backups/...`. **Cuidado de design:** NÃO aninhar por `<rootname>` no caso padrão — `parent(root)/<rootname>` É a própria raiz (colisão); usar `parent(root)/backups/<ts>` direto (a pasta-pai já é específica do projeto no layout do usuário). O `rollback` SEM `--backup-dir` precisa procurar no MESMO padrão novo (hoje usa `root`); manter CLI e GUI coerentes. Edge: raiz sem pai (drive root) → cair para dentro do projeto.
+
+### Alternativas / cuidado
+- **Prefixar cada arquivo/pasta com o nome do projeto** — descartado: alonga todos os caminhos (MAX_PATH). O aninhamento por 1 nível (só quando externo) é mais barato e o espelho já é raso (FIX-008).
+- **Aninhar `<rootname>` também no padrão (pasta-pai)** — NÃO: colide com a própria raiz. Por isso o padrão é `parent/backups/<ts>` sem nome.
+
+### Consequências
+- (a)+(b) no CHANGELOG 0.8.0 (126 testes). (c) é a próxima tarefa de código (spec curta + DEC fechada quando implementar) — ver STATUS.
+- Mudar o PADRÃO afeta o `rollback` sem `--backup-dir`: a busca default precisa migrar para a pasta-pai junto, senão o desfazer de CLI não acha o backup novo.
+
+---
+
+## DEC-025 — ASU é para EDITAR arquivos existentes; arquivo NOVO entrega-se para baixar (exceto em instrução mista)
+**Data:** 2026-06-28 · **Status:** aceita (política de uso/produto) · **Origem:** análise pedida pelo usuário + decisão dele ("será como vc recomenda… fim de papo"). Mensagem ao KCM em `kcm/mensagem-para-o-KCM-uso-do-ASU.md`.
+
+### Contexto
+Surgiu a dúvida se vale usar o ASU para CRIAR arquivos novos. Análise: **modificar** arquivo existente via ASU é econômico (a instrução carrega só localizadores + linhas mudadas; mudar 2 caracteres num arquivo de 100 linhas ≈ 25 linhas de YAML, muito menos que reentregar o arquivo) — é onde o ASU brilha (ex.: o `fileview-instrucao.yaml`, que troca `node 20→24`, é uso CORRETO). Mas **criar** arquivo novo via ASU é mais CARO (a instrução embute o arquivo inteiro no `new_content` + esqueleto YAML + caminho, contra só o arquivo se entregue para baixar) e mais FRÁGIL (escape de bloco YAML `|` pode corromper o arquivo), SEM ganho de localização (não há o que localizar).
+
+### Decisão
+- **Editar arquivo existente → ASU** (instrução de patch). **Criar arquivo novo → entregar o arquivo pronto para baixar**, não montar instrução. **Exceção:** quando o arquivo novo faz parte de uma instrução que TAMBÉM altera arquivos existentes — aí `create_file` na mesma instrução se justifica (operação atômica com backup/rollback conjuntos).
+- Isto é política de USO (como a ferramenta deve ser recomendada e como a IA consumidora deve se comportar), não muda o código do ASU — a estratégia `create_file` continua existindo (DEC-008) para o caso de bundle e para quem quiser.
+- **Reflexo no KCM:** a diretriz «Saída de código via ASU» do kit diz hoje "não arquivos inteiros… nunca arquivos soltos" — manda ASU para tudo, inclusive arquivo novo, e foi por isso que um projeto gerou a instrução no chat para o usuário criar o arquivo à mão. Pedido ao KCM (mensagem entregue): reescrever para "editar→ASU, novo→baixar (exceto bundle)" e levar uma linha-gatilho de ASU para a instrução CURTA do painel (que hoje não menciona ASU). Nota: às vezes o usuário PREFERE o arquivo para baixar mesmo numa modificação (para ler pela interface web / testar) — situacional e legítimo; a política fixa o padrão, sem proibir o contrário.
+
+### Consequências
+- Decisão de produto registrada; orienta o GUIA/PROMPT_IA e o feedback ao KCM.
+- Nenhuma mudança de código no ASU.

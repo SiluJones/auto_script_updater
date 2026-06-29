@@ -27,7 +27,7 @@ Apesar do nome ("Scripts"), a ferramenta modifica QUALQUER arquivo de texto — 
 ```
 auto_script_updater/
 ├── src/
-│   ├── __init__.py                    # __version__ (atual: "0.6.0")
+│   ├── __init__.py                    # __version__ (atual: "0.8.0")
 │   ├── __main__.py                    # CLI: validate | apply | self-test | rollback
 │   ├── core/
 │   │   ├── instruction_parser.py      # load_instruction / load_instruction_from_string; _StrictLoader (rejeita YAML duplicado)
@@ -45,8 +45,9 @@ auto_script_updater/
 │   │   └── file_strategy.py           # create_file / replace_file (DEC-008)
 │   ├── gui/
 │   │   ├── __init__.py
-│   │   ├── __main__.py                # `python -m src.gui`
-│   │   └── main_window.py            # GUI MONOLÍTICA (uma janela): MainWindow — preview/aplicar/desfazer/colar/copiar-erro/checkbox-sandbox
+│   │   ├── __main__.py                # `python -m src.gui` (argparse: --root/--instruction-dir/--instruction → run() → MainWindow)
+│   │   ├── main_window.py            # GUI (uma janela): MainWindow — preview/aplicar/desfazer/colar/copiar-erro/sandbox; recentes+fixadas; campo Backup; 2 botões de gerar .bat
+│   │   └── launcher.py               # PURO (sem Qt): resolve_instruction_in_dir (escaneia topo da pasta) + build_launcher_bat (por projeto) + build_open_gui_bat (clássico)
 │   └── schemas/
 │       └── instruction_v1.schema.json # JSON Schema — contrato do arquivo de instrução (format_version)
 ├── tests/
@@ -125,14 +126,14 @@ instrução
 - Fluxo recomendado: `validate` → `apply --dry-run` (revisa diff) → `apply` (confirma s/N, cria backup, imprime `Backup: ...\<TIMESTAMP>` e `Histórico: ...\history.log`) → `rollback <TIMESTAMP>`.
 - `self-test`: aplica a demo embutida num tempdir, confere e reverte (nada do disco é tocado).
 
-**GUI:** `python -m src.gui` (camada FINA sobre a mesma pilha do CLI — DEC-013). Botões: Pré-visualizar (dry-run; árvore 🟢/🔴/⚪ + diff colorido), Aplicar (backup), Desfazer, Colar instrução (clipboard), Copiar erro para a IA; checkbox "Aplicar em sandbox". Estado entre prévia/aplicação/desfazer protegido (FIX-007: fingerprint SHA-256 + raiz capturada).
+**GUI:** `python -m src.gui` (camada FINA sobre a mesma pilha do CLI — DEC-013). Aceita argumentos de lançamento (`--root`, `--instruction-dir`, `--instruction`) para abrir já apontada a um projeto (DEC-022). Botões: Pré-visualizar (dry-run; árvore 🟢/🔴/⚪ + diff colorido), Aplicar (backup), Desfazer, Colar instrução (clipboard), Copiar erro para a IA; checkbox "Aplicar em sandbox". Campos: Raiz (com menu "Recentes ▾" até 8 + botão 📌 fixar — DEC-022), Instrução, **Backup** (opcional, expõe `--backup-dir` — DEC-024). Dois botões de atalho: "Criar atalho .bat…" (por projeto, pré-preenche raiz+instrução) e "Criar atalho .bat (abrir GUI)…" (clássico, só abre — DEC-023). Estado entre prévia/aplicação/desfazer protegido (FIX-007: fingerprint SHA-256 + raiz capturada).
 
 ## Arquitetura — Pontos-chave (ver DECISIONS para o porquê)
 - Padrão Strategy (ABC) por tipo de arquivo — DEC-002.
 - libcst (não ast) para Python — DEC-003.
 - YAML como formato canônico — DEC-004.
 - PySide6 como GUI — DEC-005.
-- Backup obrigatório + rollback atômico — DEC-006; espelho relativo à raiz — FIX-008; local configurável + history.log — DEC-018.
+- Backup obrigatório + rollback atômico — DEC-006; espelho relativo à raiz — FIX-008; local configurável + history.log — DEC-018; exposto na GUI + aninhado por projeto quando externo — DEC-024; `rollback_from_dir` aceita o caminho da sessão. **Padrão do backup migrando para a pasta-PAI da raiz — DEC-024(c), a implementar.**
 - Schema versionado (`format_version`) — DEC-007.
 - `create_file`/`replace_file` unificam criar e patchar — DEC-008.
 - `strategy` é fonte única do `location`; interface `apply()` única — DEC-009.

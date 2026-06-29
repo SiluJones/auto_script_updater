@@ -4,8 +4,29 @@
 > **Cresce**: entradas novas no topo. Registra só o que foi de fato concluído/entregue.
 
 ## [Não lançado]
+### A fazer
+- **Padrão do backup na pasta-pai da raiz (DEC-024c):** mudar o local PADRÃO do backup de `root/backups/` para `parent(root)/backups/<ts>/` (fora do repo por padrão). Ajustar o `rollback` sem `--backup-dir` para procurar no mesmo padrão. *(decidido, ainda não implementado)*
+
+---
+
+## [0.8.0] — 2026-06-28
 ### Adicionado
-- *(nada ainda)*
+- **Atalho "abrir GUI" (clássico) — DEC-023:** novo botão "Criar atalho .bat (abrir GUI)…" + função pura `build_open_gui_bat`. Gera um `.bat` que só abre a interface (sem `--root`/`--instruction`), via `pythonw.exe` + `start "" /d "<asu_home>"` — sem janela de console, destacado, diretório de trabalho correto. Independente de projeto (salvar onde quiser). Inspirado no `flatdrop-ui.bat`.
+- **Local do backup na GUI — DEC-024(a):** linha "Backup:" com campo + "Escolher…" (`_pick_backup_dir`), persistida em `QSettings` (`last_backup_dir`). Expõe o `--backup-dir`/`backup_location` (DEC-018) que já existia no núcleo — permite manter o backup FORA do repositório sem `.gitignore`.
+- **Backup nomeado por projeto quando externo — DEC-024(b):** quando o backup vai para fora da raiz, aninha `<backup-dir>/<nome-da-raiz>/<timestamp>/` (e o `history.log` por projeto), resolvendo a mistura de vários projetos numa pasta compartilhada. `_sanitize_name` higieniza o nome para pasta Windows válida. Dentro do projeto, mantém `backups/<ts>` (sem aninhar — evita alongar caminhos, MAX_PATH/FIX-008).
+
+### Corrigido
+- **`.bat` por projeto não abria apontado (BUG do `%~dp0`) — DEC-023:** `--instruction-dir "%~dp0"` terminava em `\` → `"...\"` → a sequência `\"` era lida como aspa escapada e corrompia o argumento. Corrigido para `--instruction-dir "%~dp0."`.
+- **`chcp` agora considera a pasta do `.bat` — DEC-023:** como `%~dp0` resolve para `bat_dir` em runtime, o teste de não-ASCII passou a incluir `bat_dir` (um `.bat` em pasta acentuada nasce em UTF-8 + `chcp 65001`).
+
+### Endurecido
+- **Encoding do `.bat` gerado — DEC-023:** caminhos ASCII → `.bat` ASCII puro; caminho com acento → `chcp 65001 >nul` + arquivo UTF-8 **sem BOM**; removido o `errors="replace"` (que corromperia um caminho acentuado em silêncio). *(parte deste endurecimento foi escrita na linha 0.7.x e é lançada junto aqui.)*
+
+### Refatorado
+- **Rollback extraído para `rollback_from_dir(session_dir)` — DEC-024:** aceita o caminho completo da pasta de sessão; `rollback_session` delega a ela. Faz o desfazer funcionar igual para backup interno e externo (a GUI guarda `(pai_do_session_dir, ts)`).
+
+### Qualidade
+- Testes: 112 → **126** (endurecimento ASCII: +5 em `test_launcher.py`; bat-fix + launcher clássico: +5 em `test_launcher.py`; backup externo: +5 em `test_patch_engine.py`, +2 em `test_gui_smoke.py`); ruff/black limpos. *(A divergência 97/112/107 dos relatórios do Code foi sanada na conferência pós-merge: 126 é a contagem definitiva.)*
 
 ---
 
