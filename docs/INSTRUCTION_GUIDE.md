@@ -176,6 +176,21 @@ Um typo no caminho (`aip.version`) **cria** o galho errado em vez de falhar.
 Confira o caminho letra a letra contra o arquivo real. `append_json_array` e
 `delete_json_path` exigem caminho existente (valor `null` existe e é removível).
 
+### 4.7 Âncoras em ASCII: não ancore em setas/box-drawing
+Caracteres não-ASCII usados como literal na âncora (setas `→ ← ⟶`, traços
+longos `— –`, box-drawing `│ ├ └ ─ ┌`, marcadores `• ◦`, aspas curvas `" " ' '`)
+são uma fonte recorrente de "casou 0 vezes": variam por encoding, por cópia
+entre editores e por normalização. Quando o trecho-alvo CONTÉM esses glifos:
+
+- Em `pattern` (regex): use `.*` para saltar sobre o glifo e ancore em texto
+  ASCII estável ao redor — ex.: em vez de `^├── src/` use `^.*src/`.
+- Em `before`/`after` (âncora literal): recorte a âncora para começar/terminar
+  num ponto ASCII — escolha a linha vizinha (ou o pedaço da linha) que não
+  tenha o glifo. A âncora não precisa ser a linha inteira, só ser ÚNICA (§4.4).
+
+Não é proibido casar um caractere Unicode (a ferramenta aceita), mas ancorar em
+ASCII estável evita um round-trip de debug por um detalhe invisível.
+
 ## 5. Detalhes que evitam fricção
 
 - **Indentação no YAML:** o bloco `|` remove a indentação comum; quando o
@@ -200,6 +215,7 @@ Confira o caminho letra a letra contra o arquivo real. `append_json_array` e
 | `provavelmente JA FOI APLICADA` | O conteúdo-alvo já está no arquivo | Remova esta modificação da instrução (não repita o que já foi aplicado) |
 | `casou N vezes e 'location.occurrence' não foi especificado` | Localizador ambíguo | Amplie a âncora (multilinha) p/ ficar única, OU declare `occurrence` |
 | `Encontrei um trecho parecido na linha X… indentação/os espaços diferem` | Âncora digitada com whitespace errado | Substitua a âncora pela linha exata indicada no erro |
+| `casou 0 vez(es)` numa âncora que tem seta/box-drawing/aspas curvas | Glifo não-ASCII na âncora não casou (encoding/cópia) | Reescreva a âncora em ASCII: `.*` no `pattern`, ou recorte `before`/`after` p/ texto ASCII vizinho (§4.7) |
 | `o new_content inclui as âncoras` | Miolo repetiu `before`/`after` | Remova as âncoras do `new_content` (deixe só o conteúdo entre elas) |
 | `Âncora 'after' não encontrada depois de 'before'` | `after` não existe após o ponto, ou está antes | Escolha um `after` que ocorra DEPOIS do `before` no arquivo |
 | `Heading '…' não encontrado. Headings encontrados: …` | Heading digitado diferente | Use exatamente um dos headings listados |
