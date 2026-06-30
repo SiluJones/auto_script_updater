@@ -196,6 +196,8 @@ Confira o caminho letra a letra contra o arquivo real. `append_json_array` e
 
 | Erro contém… | Causa | Correção |
 |---|---|---|
+| `casou 0 vez(es)` + `é SUBSTRING de algo na linha N` | Âncora é parte de um nome maior, OU já aplicada | Use o nome COMPLETO indicado, ou remova a modificação se já aplicada |
+| `provavelmente JA FOI APLICADA` | O conteúdo-alvo já está no arquivo | Remova esta modificação da instrução (não repita o que já foi aplicado) |
 | `casou N vezes e 'location.occurrence' não foi especificado` | Localizador ambíguo | Amplie a âncora (multilinha) p/ ficar única, OU declare `occurrence` |
 | `Encontrei um trecho parecido na linha X… indentação/os espaços diferem` | Âncora digitada com whitespace errado | Substitua a âncora pela linha exata indicada no erro |
 | `o new_content inclui as âncoras` | Miolo repetiu `before`/`after` | Remova as âncoras do `new_content` (deixe só o conteúdo entre elas) |

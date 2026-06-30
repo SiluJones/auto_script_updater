@@ -110,6 +110,67 @@ def _whitespace_hint(source: str, needle: str) -> str:
     return ""
 
 
+def _substring_hint(source: str, needle: str) -> str:
+    """Dica quando a âncora é SUBSTRING de um identificador maior no arquivo.
+
+    Caso típico: a instrução pede ``doGen(`` mas o arquivo tem ``doGenRandom()``
+    — provável erro de escopo/digitacao, OU a modificacao ja foi aplicada e o
+    nome mudou. Damos a linha real para o gerador decidir. Nao aplica nada.
+
+    Guarda anti-ruido: so dispara para needles com >= 4 caracteres uteis, senao
+    um trecho curto (``id``, ``(``) casaria em qualquer lugar.
+    """
+    alvo = needle.strip().splitlines()[0].strip() if needle.strip() else ""
+    if len(alvo) < 4:
+        return ""
+    for i, ln in enumerate(source.split("\n")):
+        # substring presente, mas a linha inteira (normalizada) nao e a propria ancora
+        if alvo in ln and _normalize_ws(ln) != _normalize_ws(alvo):
+            return (
+                f" Nao encontrei {alvo!r}, mas e SUBSTRING de algo na linha "
+                f"{i + 1}: {ln.strip()!r}. Era esse o alvo (nome maior), ou a "
+                f"modificacao ja foi aplicada?"
+            )
+    return ""
+
+
+def _already_applied_hint(source: str, payload: str) -> str:
+    """Dica quando o conteudo que a modificacao QUER escrever ja esta no arquivo.
+
+    Sem ledger: espelha o ``patch(1)`` ("reversed/already applied" por inspecao
+    do conteudo). Comparacao tolerante a whitespace (reusa ``_normalize_ws`` por
+    linha) para nao falhar por reindentacao. So um aviso — nao altera o arquivo.
+    """
+    corpo = [_normalize_ws(ln) for ln in payload.strip().splitlines() if ln.strip()]
+    if not corpo:
+        return ""
+    fonte = [_normalize_ws(ln) for ln in source.split("\n")]
+    # procura a sequencia 'corpo' como subsequencia contigua (ignorando linhas vazias)
+    n = len(corpo)
+    janela = [ln for ln in fonte if ln != ""]
+    for i in range(0, len(janela) - n + 1):
+        if janela[i : i + n] == corpo:
+            return (
+                " Aviso: o conteudo-alvo desta modificacao ja parece presente no "
+                "arquivo — ela provavelmente JA FOI APLICADA. Se for o caso, "
+                "remova-a da instrucao."
+            )
+    return ""
+
+
+def _anchor_hints(source: str, needle: str, payload: str = "") -> str:
+    """Agrega as dicas de ancora na ordem: whitespace -> substring -> ja aplicado.
+
+    Ponto unico que as estrategias chamam ao falhar uma ancora, para nao repetir
+    a sequencia em cada call-site e centralizar a evolucao das dicas.
+    """
+    return (
+        _whitespace_hint(source, needle)
+        + _substring_hint(source, needle)
+        + _already_applied_hint(source, payload)
+    )
+
+
 class _InsertPattern(BaseStrategy):
     """Insere ``content`` antes/depois da N-ésima linha que casa o regex."""
 
@@ -122,6 +183,11 @@ class _InsertPattern(BaseStrategy):
 
         lines = _split_lines(source)
         matches = _matching_line_indices(lines, regex)
+        if not matches:
+            raise StrategyError(
+                f"Padrão {location['pattern']!r} casou 0 vez(es)."
+                + _anchor_hints(source, location["pattern"], content)
+            )
         occurrence = _resolve_occurrence(location, len(matches), f"Padrão {location['pattern']!r}")
         target = matches[occurrence - 1]
         block = _ensure_trailing_newline(content)
@@ -158,6 +224,11 @@ class ReplaceLinePattern(BaseStrategy):
 
         lines = _split_lines(source)
         matches = _matching_line_indices(lines, regex)
+        if not matches:
+            raise StrategyError(
+                f"Padrão {location['pattern']!r} casou 0 vez(es)."
+                + _anchor_hints(source, location["pattern"], new_content)
+            )
         occurrence = _resolve_occurrence(location, len(matches), f"Padrão {location['pattern']!r}")
         target = matches[occurrence - 1]
         # Preserva o terminador de linha original (\n, \r\n ou ausente no fim do arquivo).
@@ -211,7 +282,8 @@ class ReplaceContextBlock(BaseStrategy):
         n_before = self._count(source, before)
         if n_before == 0:
             raise StrategyError(
-                f"Âncora 'before' não encontrada: {before!r}.{_whitespace_hint(source, before)}"
+                f"Âncora 'before' não encontrada: {before!r}."
+                f"{_anchor_hints(source, before, new_content)}"
             )
         occurrence = _resolve_occurrence(location, n_before, f"Âncora 'before' {before!r}")
         start = self._nth_index(source, before, occurrence)
@@ -220,7 +292,7 @@ class ReplaceContextBlock(BaseStrategy):
         if after_pos == -1:
             raise StrategyError(
                 f"Âncora 'after' não encontrada depois de 'before': {after!r}."
-                f"{_whitespace_hint(source[inner_start:], after)}"
+                f"{_anchor_hints(source[inner_start:], after)}"
             )
         # Guarda contra o erro mais comum: incluir as próprias âncoras no
         # new_content. Como 'before'/'after' PERMANECEM no arquivo, repeti-las

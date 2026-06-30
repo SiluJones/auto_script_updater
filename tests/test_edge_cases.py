@@ -389,3 +389,68 @@ def test_context_anchor_no_hint_when_truly_absent():
             new_content="x",
         )
     assert "parecido" not in str(exc.value)  # nada parecido => sem dica falsa
+
+
+# ─────────────── F5: dicas "já aplicado?" no erro de âncora ───────────────
+
+
+def test_substring_hint_em_insert_after():
+    """A dica opera sobre o texto BRUTO do regex (sem decodificar escapes), por
+    isso o caso que a exercita via padrão é o de uma barra invertida literal no
+    arquivo (ex.: caminho Windows) que confunde o escape do regex: o regex
+    compilado ('\\(' = parêntese literal, sem barra) casa 0 vezes, mas o texto
+    cru do padrão ('doGen\\(') aparece, ele mesmo, como substring da linha."""
+    src = "rota: doGen\\(extra)\n"
+    with pytest.raises(StrategyError, match="SUBSTRING") as exc:
+        apply(
+            "insert_after_pattern",
+            src,
+            location={"pattern": "doGen\\("},
+            content="x",
+        )
+    assert "doGen" in str(exc.value)
+
+
+def test_already_applied_hint_replace_line():
+    src = "x = 1\ny = 2\n"
+    with pytest.raises(StrategyError, match="JA FOI APLICADA"):
+        apply(
+            "replace_line_pattern",
+            src,
+            location={"pattern": r"^z = 9$"},
+            new_content="y = 2",
+        )
+
+
+def test_already_applied_hint_context_block():
+    src = "def f():\n    a\nnovo_trecho\n# fim\n"
+    with pytest.raises(StrategyError, match="JA FOI APLICADA"):
+        apply(
+            "replace_context_block",
+            src,
+            location={"before": "gamma_inexistente", "after": "# fim"},
+            new_content="novo_trecho",
+        )
+
+
+def test_substring_hint_ignora_ancora_curta():
+    src = "def doGenRandom():\n    return 1\n"
+    with pytest.raises(StrategyError) as exc:
+        apply(
+            "insert_after_pattern",
+            src,
+            location={"pattern": r"id"},
+            content="x",
+        )
+    assert "SUBSTRING" not in str(exc.value)
+
+
+def test_whitespace_hint_ainda_funciona():
+    src = "func _ready():\n\tvar x = 1\n\treturn x\n"
+    with pytest.raises(StrategyError, match="parecido na linha 1"):
+        apply(
+            "replace_context_block",
+            src,
+            location={"before": "func _ready():\n    var x = 1", "after": "return x"},
+            new_content="\tvar x = 2",
+        )
