@@ -1,28 +1,43 @@
-# Atualizador Automático de Scripts
+# Atualizador Automático de Scripts (ASU)
 
 Ferramenta que aplica modificações a arquivos de um projeto (`.py`, `.md`,
 `.json`, `.txt` e **qualquer linguagem** via janela de contexto) a partir de um
 **arquivo de instrução** gerado por IA. Elimina o copia-e-cola manual de trechos
 de código entre sessões: a IA emite um YAML estruturado, você confere o diff e
-aplica com um comando.
+aplica com um comando — ou pela interface gráfica.
 
 > Documentação de contexto completa (visão, arquitetura, decisões, armadilhas):
-> ver `CONTEXT.md`, `DECISIONS.md` e `ROADMAP.md`.
+> ver `meta/CONTEXT.md`, `meta/DECISIONS.md` e `meta/ROADMAP.md`.
 
-## Estado atual — F1 (Core Engine + CLI)
+## Estado atual — 0.8.2
 
-A camada de execução está funcional e testada via linha de comando. A GUI
-(PySide6) vem na F2 e reusará exatamente a mesma pilha (`parser → validator →
-engine`).
+O núcleo (CLI) e a interface gráfica (PySide6) estão funcionais e testados
+(**133 testes**). A GUI reusa exatamente a mesma pilha do CLI
+(`parser → validator → engine`), sem lógica própria.
 
 Implementado:
-- Parser (YAML/JSON) + validador contra JSON Schema (`format_version`).
-- 13 estratégias de modificação (Python via libcst, texto/contexto universal,
-  Markdown, JSON via jmespath, arquivo inteiro).
+- Parser (YAML/JSON, com fallback de encoding) + validador contra JSON Schema
+  (`format_version`), com intake estrito (chave YAML duplicada, IDs repetidos e
+  arquivo binário são rejeitados com erro claro).
+- **13 estratégias** de modificação: Python via libcst (`replace_function`,
+  `replace_method`, `replace_class`); texto/contexto universal
+  (`insert_after_pattern`, `insert_before_pattern`, `replace_line_pattern`,
+  `replace_context_block`); Markdown (`replace_section`, fence-aware); JSON com
+  navegador de caminho próprio (`set_json_path`, `append_json_array`,
+  `delete_json_path`); arquivo inteiro (`create_file`, `replace_file`).
 - Resolução de caminhos (relativo à raiz / absoluto) com guarda de contenção.
-- Backup obrigatório timestampado + **rollback automático** em falha (atômico).
-- Renderização de diff colorido.
-- CLI com `validate`, `apply` (prévia + confirmação) e `rollback`.
+- **Backup obrigatório** timestampado + **rollback** atômico (automático em falha
+  e manual por timestamp). Por padrão o backup vai para **fora do repositório**
+  (`parent(raiz)/backups/<timestamp>/`); configurável via `--backup-dir`.
+- Log consolidado `history.log` (uma linha por aplicação).
+- Renderização de diff colorido (unified diff).
+- CLI com `validate`, `apply` (prévia + confirmação), `rollback`, `self-test`,
+  `--sandbox`.
+- GUI: recentes/fixadas, atalhos `.bat` por projeto, campo de backup, colar
+  instrução da área de transferência, copiar erro para a IA.
+- Encodings seguros: BOM UTF-8 preservado (roundtrip com Visual Studio); cp1252
+  e CRLF preservados; UTF-16/32 rejeitados com erro claro.
+- Multilinguagem comprovada por teste (C#, C++, Java, JSX, TSX, GDScript).
 
 ## Instalação (Windows)
 
@@ -32,7 +47,13 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Para desenvolvimento (testes + GUI futura + qualidade):
+Para a GUI:
+
+```
+pip install -r requirements-gui.txt
+```
+
+Para desenvolvimento (testes + qualidade):
 
 ```
 pip install -r requirements-dev.txt
@@ -56,12 +77,13 @@ python -m src rollback <TIMESTAMP> --root examples\demo_project
 - O 3º aplica de verdade (cria backup e pede confirmação); ao final imprime o `Backup: ...\<TIMESTAMP>`.
 - O 4º desfaz tudo: copie o `<TIMESTAMP>` impresso pelo passo anterior (ex.: `20260610_041628`).
 
-Depois de testar, a demo volta ao estado original (via rollback acima ou
-`git checkout examples\demo_project`), então você pode repetir à vontade.
+Por padrão o backup vai para a **pasta-pai** da raiz (fora do projeto), então o
+repositório fica limpo. Para desfazer, o `rollback` procura no mesmo lugar
+automaticamente; se você usou `--backup-dir`, repita a mesma flag no rollback.
 
 > Nota: `examples\exemplo_instrucao.yaml` é apenas **ilustrativo** — aponta para
-> caminhos fictícios (`src/auth/login.py`, `C:\projetos\...`) e **não roda** como
-> está. Para testar de fato, use `examples\demo.yaml` acima.
+> caminhos fictícios e **não roda** como está. Para testar de fato, use
+> `examples\demo.yaml` acima.
 
 ## Uso no seu projeto
 
@@ -75,12 +97,14 @@ python -m src apply MINHA_INSTRUCAO.yaml --root C:\meu_projeto
 python -m src rollback <TIMESTAMP> --root C:\meu_projeto
 ```
 
-Flags úteis: `--dry-run` (simula sem escrever), `--yes` (aplica sem perguntar),
-`--no-color` (saída sem cores), `--no-backup` (não recomendado).
+Flags úteis do `apply`: `--dry-run` (simula sem escrever), `--yes`/`-y` (aplica
+sem perguntar), `--no-color` (saída sem cores), `--no-backup` (não recomendado),
+`--sandbox` (aplica numa cópia irmã), `--backup-dir PASTA` (onde criar a pasta
+`backups/`). O `rollback` aceita `--root` e `--backup-dir`.
 
-## Interface gráfica (F2)
+## Interface gráfica
 
-Com as dependências de GUI instaladas (`pip install -r requirements-gui.txt`):
+Com as dependências de GUI instaladas:
 
 ```
 python -m src.gui
@@ -89,6 +113,18 @@ python -m src.gui
 Escolha a raiz e a instrução, clique **Pré-visualizar (dry-run)** para ver a
 árvore de arquivos (🟢 ok / 🔴 falha, com cada modificação ✓/✗) e o diff
 colorido, depois **Aplicar** (cria backup) ou **Desfazer última aplicação**.
+Recursos de conveniência:
+- **Recentes ▾** (até 8) e botão **📌** para fixar as raízes que você mais usa.
+- Campo **Backup:** para escolher onde o backup é criado (expõe o `--backup-dir`).
+- **Colar instrução** — lê o YAML direto da área de transferência, sem salvar arquivo.
+- **Copiar erro para a IA** — em falha, copia um bloco pronto (erro + referência
+  do guia) para colar na IA geradora e corrigir a instrução.
+- **Aplicar em sandbox (cópia)** — paridade com o `--sandbox` do CLI.
+- **Criar atalho .bat…** — gera um atalho por projeto (reabre a GUI já apontada)
+  e um atalho clássico "abrir GUI".
+
+Passo a passo detalhado (com as decisões de fluxo e dicas): ver
+`docs/GUIA_PASSO_A_PASSO.md`.
 
 ## Verificação rápida da instalação
 
@@ -114,17 +150,15 @@ o caminho — o projeto original não é tocado. Revise, copie o que aprovar e
 apague a pasta. (Instruções com `path_mode: absolute` são recusadas nesse modo,
 pois escapariam da cópia.)
 
-Manualmente, o equivalente: duplique a pasta do projeto-alvo, aplique a
-instrução na duplicata, confira o resultado e só
-então leve para o projeto real. Com Git fica ainda melhor — a working tree é a
-"duplicata" com diff e desfazer nativos:
+Com Git fica ainda melhor — a working tree é a "duplicata" com diff e desfazer
+nativos:
 
 ```
 git add -A & git commit -m "antes do ASU"
 python -m src apply instrucao.yaml --root . --dry-run
 python -m src apply instrucao.yaml --root .
-git diff                       (revisão fina)
-git restore .                  (desfazer tudo, se necessário)
+git diff
+git restore .
 ```
 
 As camadas de proteção do ASU (dry-run, backup automático, rollback atômico e
@@ -134,13 +168,22 @@ por timestamp) continuam ativas em qualquer um dos fluxos.
 
 Para que uma IA gere instruções corretas de primeira em **qualquer projeto seu**:
 
-1. copie `docs/INSTRUCTION_GUIDE.md` para a base de conhecimento do projeto;
+1. copie `docs/INSTRUCTION_GUIDE.md` para a base de conhecimento do projeto (ou
+   suba o arquivo e referencie-o nas instruções — assim uma atualização é só
+   trocar o arquivo);
 2. cole o bloco de `docs/PROMPT_IA.md` nas instruções do projeto;
 3. peça: *"emita uma instrução ASU para estas mudanças"*.
 
 O guia codifica as regras que evitam os erros clássicos (âncoras no miolo,
-`after` ambíguo, decoradores, `occurrence`, caminhos JSON) e termina com um
-checklist de autovalidação.
+`after` ambíguo, decoradores, `occurrence`, caminhos JSON, âncoras em ASCII) e
+termina com um checklist de autovalidação e uma seção de verificação
+pós-aplicação.
+
+> Quando usar o ASU: ele brilha ao **editar arquivos existentes** (a instrução
+> carrega só localizadores + linhas mudadas). Para **criar arquivo novo**, em
+> geral é mais simples entregar o arquivo pronto para baixar — a não ser que ele
+> faça parte de uma instrução que também altera arquivos existentes (aí o
+> `create_file` na mesma instrução dá atomicidade). Ver DEC-025.
 
 ## Testes
 
@@ -148,6 +191,8 @@ checklist de autovalidação.
 pip install -r requirements-dev.txt
 python -m pytest
 ```
+
+Qualidade: `ruff check .` e `black --check .`.
 
 ## Formato da instrução (resumo)
 
@@ -174,4 +219,4 @@ files:
 ```
 
 A `strategy` é a fonte única de como interpretar `location` — **nunca** se usa
-número de linha como localizador (ver DEC-001).
+número de linha como localizador (ver DEC-001, em `meta/DECISIONS-archive.md`).

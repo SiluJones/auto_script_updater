@@ -69,7 +69,7 @@ auto_script_updater/
 └── .gitignore                         # ignora backups/, examples/demo_project/src/health.py, *_sandbox_*/
 
 # NÃO versionados no Projeto (vivem no Git): logs/AAAA-MM-DD.md (logs de sessão).
-# Docs de contexto (meta/): CEREBRO (ex-CLAUDE), CONTEXT, STATUS, DECISIONS, CHANGELOG, IDEAS, ROADMAP, GLOSSARY, HISTORICO, LOG-TEMPLATE.
+# Docs de contexto (meta/): CEREBRO (ex-CLAUDE), CONTEXT, STATUS, DECISIONS, CHANGELOG, IDEAS, ROADMAP, GLOSSARY, HISTORY, LOG-TEMPLATE.
 # Raiz do repo (modo Claude Code): CLAUDE.md (ponteiro curto p/ o Code) + .claude/ (settings.json + commands/). HUB.md do toolchain vive na pasta-raiz comum aos 3 projetos (não dentro deste repo).
 ```
 

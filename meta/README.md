@@ -13,4 +13,4 @@ Arquivos:
 - **LOG-TEMPLATE.md** — Modelo do log de sessão. Referência fixa — nunca substituído pelo conteúdo preenchido.
 - **ROADMAP.md** — OPCIONAL — plano deliberado de evolução em fases. Use quando o projeto tem direção de médio/longo prazo.
 - **GLOSSARY.md** — OPCIONAL — termos próprios do projeto. Use quando há jargão que se repete entre sessões.
-- **HISTORICO.md** — OPCIONAL — conhecimento consolidado de fases antigas (guias, análises que não cabem no CONTEXT enxuto). Lido sob demanda.
+- **HISTORY.md** — OPCIONAL — conhecimento consolidado de fases antigas (guias, análises que não cabem no CONTEXT enxuto). Lido sob demanda.
