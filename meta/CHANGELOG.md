@@ -3,6 +3,31 @@
 > Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/) e versionamento [SemVer](https://semver.org/lang/pt-BR/).
 > **Cresce**: entradas novas no topo. Registra só o que foi de fato concluído/entregue.
 
+## [Não lançado]
+### Documentação / Processo (2026-07-03 — sem mudança de código)
+- **README.md** reescrito para 0.8.2 (backup padrão na pasta-pai, `--backup-dir`, `history.log`, GUI completa, 13 estratégias, encodings, quando-usar-ASU).
+- **GUIA_PASSO_A_PASSO.md** criado (ideia-260614): local do `instrucao.yaml`, subir o `PROMPT_IA.md` ao projeto, `--backup-dir`/`history.log`/sandbox, `--no-backup`.
+- **DECISIONS arquivado** — DEC-001..012 + FIX-001..006 → `meta/DECISIONS-archive.md` (o principal passou de 715 linhas). Numeração preservada.
+- **2ª atualização do KCM integrada — DEC-027:** config-no-Code no CEREBRO, convenção de spec do KCM (`AAMMDD-specNNNN-desc.md` / `AAMMDD-asuNNNN.yaml`), `HISTORICO.md`→`HISTORY.md`, painel (Instruções do Projeto) atualizado.
+- **HUB.md** atualizado (status relâmpago do ASU → 0.8.2).
+
+---
+
+## [0.8.2] — 2026-06-30
+### Adicionado
+- **Dicas "já aplicado?" no erro de âncora — DEC-026:** quando uma âncora casa 0 vezes, a mensagem de erro agora pode incluir duas dicas novas, além da de whitespace (DEC-014): (1) **substring** — a âncora é parte de um identificador maior no arquivo (ex.: `doGen(` ⊂ `doGenRandom()`), provável erro de escopo/digitação; (2) **já aplicado** — o `new_content`/`content` que a modificação quer escrever já está presente no arquivo (comparação tolerante a whitespace), forte sinal de que a modificação já foi aplicada. Detecção **sem ledger**, feita em memória só no caminho de erro (ASU continua *stateless* no projeto-alvo).
+- Funções novas e puras em `text_strategy.py`: `_substring_hint`, `_already_applied_hint`, agregadas por `_anchor_hints` (ponto único chamado pelas estratégias ao falhar uma âncora).
+
+### Corrigido / Ajustado
+- `insert_after_pattern`/`replace_line_pattern` agora dão dica também no caminho de "casou 0 vez(es)" (antes esse caminho não tinha `source`/`new_content` em escopo para dar dica nenhuma).
+- `docs/INSTRUCTION_GUIDE.md` §6: duas linhas novas na tabela erro→correção.
+
+### Qualidade
+- Testes: 128 → **133** (5 novos em `test_edge_cases.py`); ruff limpo; `black --check` confirmado limpo nos arquivos tocados (validado na conferência do chat — o ambiente do Code não tinha `black` instalado).
+- `__version__` bumpeado para `0.8.2`.
+
+---
+
 ## [0.8.1] — 2026-06-28
 ### Adicionado
 - **Backup padrão na pasta-pai da raiz — DEC-024(c):** sem `--backup-dir`, o backup vai para `parent(root)/backups/<timestamp>/` em vez de `root/backups/`. Projeto fica limpo por padrão. Edge: `root` sem pai utilizável (drive root) → fallback para `root/backups/` (seguro). NÃO aninha por `<rootname>` no padrão (colidiria com a própria raiz).

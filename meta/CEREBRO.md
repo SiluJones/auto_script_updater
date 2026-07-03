@@ -96,7 +96,7 @@ Cada arquivo tem um papel e um comportamento temporal distinto. **Respeite o pap
 | `LOG-TEMPLATE.md` | Referência fixa | Modelo do log de sessão. Referência fixa — nunca substituído pelo conteúdo preenchido. |
 | `ROADMAP.md` | Plano em fases | OPCIONAL — plano deliberado de evolução em fases. Use quando o projeto tem direção de médio/longo prazo. |
 | `GLOSSARY.md` | Estável | OPCIONAL — termos próprios do projeto. Use quando há jargão que se repete entre sessões. |
-| `HISTORICO.md` | Cresce (histórico) | OPCIONAL — conhecimento consolidado de fases antigas (guias, análises que não cabem no CONTEXT enxuto). Lido sob demanda. |
+| `HISTORY.md` | Cresce (histórico) | OPCIONAL — conhecimento consolidado de fases antigas (guias, análises que não cabem no CONTEXT enxuto). Lido sob demanda. |
 | `logs/AAAA-MM-DD.md` | Histórico | Ao final de cada sessão (formato em LOG-TEMPLATE). |
 
 ## Regras de higiene (impedem inchaço e duplicação)
@@ -219,6 +219,17 @@ O usuário trabalha em **Windows (CMD/Prompt de Comando)**. Qualquer comando de 
 
 Respostas em pt-BR, incluindo comentários quando houver código.
 
+## Recomendação de configuração (fim de sessão)
+
+No fim de cada sessão, junto do resumo e de qualquer dúvida, avalie o que a **próxima etapa** exige e recomende a configuração de forma **completa e explícita**. Os controles dependem de ONDE se trabalha:
+
+- **No chat (claude.ai):** **modelo** (recomende pela capacidade — o mais capaz vs. um mais leve —, não pelo nome/versão, que muda), **esforço** (Baixo / Médio / Alto / Extra / Máximo) e **pensamento** (ligado/desligado): três controles independentes.
+- **No Claude Code (CLI/desktop):** **modelo** + **nível de esforço** (`/effort` baixo→máximo, ou `xhigh`/`ultracode` onde houver). **Não há toggle de pensamento** no Code — ele é acoplado ao esforço; para um turno difícil pontual, use `ultrathink` no prompt. Nunca recomende "ligar o pensamento" no Code.
+- **Nunca afirme saber a configuração atual** — ela não é legível de forma confiável. Recomende pela TAREFA e pela config que o usuário declarou.
+- Próxima etapa **pesada** + config provável fraca → **pare e peça o aumento, nomeando os níveis exatos**.
+- Etapa atual **leve** mas config **alta** → **não pare no meio**; termine e, no fim, sinalize "pode baixar para X na próxima".
+- É um **default recomendado**, não proibição — cabe sob a válvula de desvio registrado.
+
 ## Desenvolvimento no Claude Code (raias chat ↔ Code)
 
 Este projeto é desenvolvido com o **Claude Code** (CLI/desktop), além do chat de planejamento. Há duas raias:
@@ -227,6 +238,8 @@ Este projeto é desenvolvido com o **Claude Code** (CLI/desktop), além do chat 
 - **Claude Code (execução):** implementa o código do ASU (`src/`, `tests/`) e faz edições **append-only** nos `meta/` (linha no STATUS, `DEC-`/`FIX-` no DECISIONS, marcar estado de fase no ROADMAP). Aplica as specs de doc. Roda a validação (`python -m pytest`, `python -m src self-test`, `ruff check .`, `black --check .`). Commita.
 
 **Método "doc por spec":** o chat AUTORA o texto; o Code só POSICIONA — não inventa prosa de curadoria. **Um canal por doc por ciclo** (se um doc foi por spec, o chat não entrega o mesmo doc inteiro no mesmo ciclo). Specs **só de doc não tocam o produto** → não precisam de build; a rede é o `git diff`. Edição de CÓDIGO sempre roda a validação antes de commitar.
+
+**Convenção de nome das specs e instruções (`meta/specs/`):** padrão do KCM — specs seguem `AAMMDD-specNNNN-desc.md` (ex.: `260703-spec0006-highlight-diff.md`) e instruções ASU seguem `AAMMDD-asuNNNN.yaml`. `NNNN` é numeração sequencial e estável; a data é a de criação; `desc` é um slug curto em minúsculas-com-hífen. O chat nomeia; o Code aplica. Cada spec abre com um bloco `>` de metadados — **Tipo** (FEATURE/FIX/DOC), **Autoria/Execução**, e o lembrete de que **âncoras são semânticas** (símbolo de código ou título de seção, nunca nº de linha) com o protocolo "se não achar, PARE e reporte". Specs aplicadas podem ser arquivadas quando convém (sair do Projeto/raiz); o registro do que elas fizeram vive no STATUS/CHANGELOG/DECISIONS, não na spec. *(Specs antigas com o padrão legado `F<n>-slug.md` — F2/F3/F5 — ficam como estão; o padrão novo vale a partir daqui.)*
 
 **Ao APLICAR uma spec (Code):** localize cada âncora EXATAMENTE; se não achar uma, **PARE e reporte** — nunca chute um lugar próximo. Não toque em nada fora das edições nomeadas. Rode `git diff` e confira a forma esperada antes de commitar.
 
