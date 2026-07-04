@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from ..strategies import StrategyError, get_strategy
+from ..strategies.base_strategy import split_apply_result
 from . import diff_renderer
 from .backup_manager import BackupManager
 from .file_locator import FileLocatorError, ensure_ready, resolve_path
@@ -107,6 +108,7 @@ class ModificationResult:
     strategy: str
     ok: bool
     error: str | None = None
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -120,6 +122,11 @@ class FileResult:
     error: str | None = None
     modifications: list[ModificationResult] = field(default_factory=list)
 
+    @property
+    def has_warnings(self) -> bool:
+        """True se qualquer modificação deste arquivo emitiu aviso não-fatal."""
+        return any(m.warnings for m in self.modifications)
+
 
 @dataclass
 class ApplyReport:
@@ -130,6 +137,11 @@ class ApplyReport:
     files: list[FileResult] = field(default_factory=list)
     backup_dir: str | None = None
     rolled_back: bool = False
+
+    @property
+    def has_warnings(self) -> bool:
+        """True se qualquer arquivo do relatório tem avisos não-fatais."""
+        return any(f.has_warnings for f in self.files)
 
 
 def _effective_settings(
@@ -307,8 +319,9 @@ def apply_instruction(
             mod_id = mod.get("id", "?")
             strat_name = mod.get("strategy", "?")
             try:
-                current = get_strategy(strat_name).apply(current, mod)
-                mod_results.append(ModificationResult(mod_id, strat_name, ok=True))
+                resultado = get_strategy(strat_name).apply(current, mod)
+                current, avisos = split_apply_result(resultado)
+                mod_results.append(ModificationResult(mod_id, strat_name, ok=True, warnings=avisos))
             except StrategyError as exc:
                 mod_results.append(ModificationResult(mod_id, strat_name, ok=False, error=str(exc)))
                 file_failed = True

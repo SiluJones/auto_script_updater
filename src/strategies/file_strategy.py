@@ -28,4 +28,9 @@ class CreateFile(BaseStrategy):
     name = "create_file"
 
     def apply(self, source: str, modification: Mapping[str, Any]) -> str:
-        return modification.get("content", "")
+        novo_conteudo = modification.get("content", "")
+        if source:
+            return novo_conteudo, [
+                "create_file sobre arquivo existente: o conteúdo anterior foi substituído."
+            ]
+        return novo_conteudo

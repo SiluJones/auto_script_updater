@@ -9,7 +9,8 @@ import pytest
 
 from src.core.backup_manager import rollback_from_dir
 from src.core.file_locator import FileLocatorError, resolve_path
-from src.core.patch_engine import apply_instruction
+from src.core.patch_engine import ModificationResult, apply_instruction
+from src.strategies.base_strategy import split_apply_result
 
 # ───────────────────────── file_locator ─────────────────────────
 
@@ -134,6 +135,106 @@ def test_create_file_makes_dirs(tmp_path):
     assert report.ok
     assert report.files[0].status == "created"
     assert (tmp_path / "pkg" / "sub" / "new.py").read_text(encoding="utf-8") == "x = 1\n"
+
+
+# ── Canal de warnings (spec 0001) ─────────────────────────────────────────
+
+
+def test_split_apply_result_str():
+    assert split_apply_result("x") == ("x", [])
+
+
+def test_split_apply_result_tupla():
+    assert split_apply_result(("x", ["a"])) == ("x", ["a"])
+
+
+def test_modification_result_carrega_warnings():
+    mr = ModificationResult("m1", "create_file", ok=True, warnings=["aviso"])
+    assert mr.warnings == ["aviso"]
+
+
+def test_engine_coleta_warning_do_piloto(tmp_path):
+    """create_file sobre arquivo existente emite warning, mas continua ok."""
+    f = tmp_path / "existente.txt"
+    f.write_text("conteudo antigo\n", encoding="utf-8")
+    instr = _instr(
+        [
+            {
+                "id": "existente",
+                "path_mode": "relative",
+                "relative_path": "existente.txt",
+                "type": "text",
+                "modifications": [
+                    {
+                        "id": "m1",
+                        "description": "d",
+                        "strategy": "create_file",
+                        "content": "conteudo novo\n",
+                    }
+                ],
+            }
+        ]
+    )
+    report = apply_instruction(instr, root_path=tmp_path, color=False)
+    assert report.ok is True
+    assert f.read_text(encoding="utf-8") == "conteudo novo\n"
+    assert report.has_warnings is True
+    assert report.files[0].has_warnings is True
+    assert "substitu" in report.files[0].modifications[0].warnings[0]
+
+
+def test_engine_sem_warning_fica_limpo(tmp_path):
+    """Estrategia comum (sem emissao de warning) mantem has_warnings False."""
+    f = tmp_path / "m.py"
+    f.write_text("def a():\n    return 1\n", encoding="utf-8")
+    instr = _instr(
+        [
+            _py_file(
+                "m.py",
+                [
+                    {
+                        "id": "m1",
+                        "description": "d",
+                        "strategy": "replace_function",
+                        "location": {"name": "a"},
+                        "new_content": "def a():\n    return 99\n",
+                    }
+                ],
+            )
+        ]
+    )
+    report = apply_instruction(instr, root_path=tmp_path, color=False)
+    assert report.ok
+    assert report.has_warnings is False
+    assert report.files[0].modifications[0].warnings == []
+
+
+def test_warning_nao_aborta_nem_reverte(tmp_path):
+    """O warning do piloto nao vira erro: nao aborta, nao reverte, nao marca failed."""
+    f = tmp_path / "existente.txt"
+    f.write_text("antigo\n", encoding="utf-8")
+    instr = _instr(
+        [
+            {
+                "id": "existente",
+                "path_mode": "relative",
+                "relative_path": "existente.txt",
+                "type": "text",
+                "modifications": [
+                    {
+                        "id": "m1",
+                        "description": "d",
+                        "strategy": "create_file",
+                        "content": "novo\n",
+                    }
+                ],
+            }
+        ]
+    )
+    report = apply_instruction(instr, root_path=tmp_path, color=False)
+    assert report.ok is True
+    assert report.rolled_back is False
+    assert report.files[0].status != "failed"
 
 
 def test_atomic_rollback_on_failure(tmp_path):

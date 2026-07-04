@@ -229,6 +229,12 @@ def test_create_file_returns_content():
     assert out == "linha\n"
 
 
+def test_create_file_sobrescreve_emite_warning():
+    out, avisos = apply("create_file", "conteudo antigo", content="linha\n")
+    assert out == "linha\n"
+    assert avisos and "substitu" in avisos[0]
+
+
 def test_replace_file_ignores_source():
     out = apply("replace_file", "conteúdo antigo enorme", new_content="novo\n")
     assert out == "novo\n"

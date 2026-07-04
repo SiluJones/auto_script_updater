@@ -48,6 +48,11 @@ class BaseStrategy(ABC):
         Returns:
             O novo conteúdo completo do arquivo.
 
+            Pode retornar, em vez de só a string, uma tupla ``(novo_conteudo, avisos)``
+            onde ``avisos`` é uma lista de mensagens não-fatais (ressalvas que o
+            usuário deve ver — ex.: âncora casada por fuzzy de whitespace, arquivo
+            sobrescrito). Use ``split_apply_result`` no consumidor para normalizar.
+
         Raises:
             StrategyError: se o alvo não for encontrado, for ambíguo, ou a
                 aplicação falhar.
@@ -61,3 +66,21 @@ def get_location(modification: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(loc, dict):  # pragma: no cover - schema já garante
         raise StrategyError("Campo 'location' deveria ser um objeto.")
     return loc
+
+
+# Tipo do retorno de apply(): ou só o texto novo, ou (texto novo, avisos).
+# Retrocompatível — estratégias que não avisam continuam retornando str puro.
+ApplyResult = "str | tuple[str, list[str]]"
+
+
+def split_apply_result(result: str | tuple[str, list[str]]) -> tuple[str, list[str]]:
+    """Normaliza o retorno de ``apply()``: sempre devolve ``(texto, avisos)``.
+
+    Aceita tanto ``str`` (sem avisos) quanto ``(str, list[str])`` (com avisos),
+    para que estratégias antigas — que retornam só o texto — sigam funcionando
+    sem mudança. Avisos são mensagens curtas, PT-BR, não-fatais.
+    """
+    if isinstance(result, tuple):
+        texto, avisos = result
+        return texto, list(avisos)
+    return result, []
