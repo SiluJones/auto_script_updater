@@ -19,6 +19,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")  # roda sem servidor gráf
 
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
+from src.core.patch_engine import ApplyReport, FileResult, ModificationResult  # noqa: E402
 from src.gui.main_window import MainWindow, _diff_to_html  # noqa: E402
 
 _REPO = Path(__file__).resolve().parent.parent
@@ -355,3 +356,89 @@ def test_save_and_restore_backup_dir(app, tmp_path):
     win2._settings = win._settings  # compartilha o mesmo QSettings
     win2._restore_last_paths()
     assert win2.backup_edit.text() == pasta
+
+
+# ── spec 0002: indicador 🟡 "aplicado com ressalva" ───────────────────────
+
+
+def test_tree_mostra_amarelo_com_ressalva(app):
+    """Arquivo modified + has_warnings True → item de topo comeca com 🟡."""
+    fr = FileResult(
+        "f1",
+        "a.py",
+        "modified",
+        modifications=[ModificationResult("m1", "create_file", ok=True, warnings=["aviso"])],
+    )
+    report = ApplyReport(ok=True, dry_run=True, files=[fr])
+    win = MainWindow()
+    win._populate_tree(report)
+    assert win.tree.topLevelItem(0).text(0).startswith("🟡")
+
+
+def test_tree_falha_vence_ressalva(app):
+    """Arquivo failed com warnings ainda mostra 🔴 (falha vence ressalva)."""
+    fr = FileResult(
+        "f1",
+        "a.py",
+        "failed",
+        error="deu ruim",
+        modifications=[ModificationResult("m1", "create_file", ok=False, error="deu ruim")],
+    )
+    report = ApplyReport(ok=False, dry_run=True, files=[fr])
+    win = MainWindow()
+    win._populate_tree(report)
+    assert win.tree.topLevelItem(0).text(0).startswith("🔴")
+
+
+def test_modificacao_ressalva_mostra_warn(app):
+    """Modificacao ok=True com warnings → filho comeca com ⚠ e rotulo 'ressalva'."""
+    fr = FileResult(
+        "f1",
+        "a.py",
+        "modified",
+        modifications=[ModificationResult("m1", "create_file", ok=True, warnings=["aviso"])],
+    )
+    report = ApplyReport(ok=True, dry_run=True, files=[fr])
+    win = MainWindow()
+    win._populate_tree(report)
+    filho = win.tree.topLevelItem(0).child(0)
+    assert filho.text(0).strip().startswith("⚠")
+    assert filho.text(1) == "ressalva"
+
+
+def test_aplicar_habilitado_com_ressalva(app, demo_root):
+    """create_file sobre arquivo existente emite warning; Aplicar segue habilitado."""
+    import yaml
+
+    alvo = demo_root / "src" / "calculator.py"
+    assert alvo.exists()
+    instr = {
+        "format_version": "1.0",
+        "description": "ressalva proposital",
+        "files": [
+            {
+                "id": "f1",
+                "path_mode": "relative",
+                "relative_path": "src/calculator.py",
+                "type": "text",
+                "modifications": [
+                    {
+                        "id": "m1",
+                        "description": "d",
+                        "strategy": "create_file",
+                        "content": "conteudo novo\n",
+                    }
+                ],
+            }
+        ],
+    }
+    caminho = demo_root.parent / "instr_ressalva.yaml"
+    caminho.write_text(yaml.safe_dump(instr, allow_unicode=True), encoding="utf-8")
+
+    win = MainWindow()
+    win.root_edit.setText(str(demo_root))
+    win.instr_edit.setText(str(caminho))
+    win.preview()
+    assert win._preview_report.has_warnings is True
+    assert win.btn_apply.isEnabled()
+    assert win.tree.topLevelItem(0).text(0).startswith("🟡")

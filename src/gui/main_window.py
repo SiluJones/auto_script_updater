@@ -3,7 +3,7 @@
 Fluxo: escolher a raiz do projeto e o arquivo de instrução → **Pré-visualizar**
 roda o ``patch_engine`` em *dry-run* e popula a árvore (um item por arquivo,
 filhos por modificação) com o indicador de confiança derivado do resultado
-(🟢 ok / 🔴 falha — o 🟡 chegará com o canal de warnings, ver IDEAS) →
+(🟢 aplicável / 🟡 aplicável com ressalva / 🔴 falha / ⚪ sem alteração) →
 **Aplicar** repete a execução escrevendo em disco (com backup) → **Desfazer**
 reverte a última aplicação pelo timestamp do backup.
 
@@ -666,19 +666,36 @@ class MainWindow(QMainWindow):
     def _populate_tree(self, report: ApplyReport) -> None:
         self.tree.clear()
         for fr in report.files:
-            # 🔴 falha; 🟢 mudança aplicável; ⚪ sem alteração.
-            icone = "🔴" if fr.status == "failed" else ("⚪" if fr.status == "unchanged" else "🟢")
+            # 🔴 falha > 🟡 aplicável com ressalva > 🟢 aplicável limpo > ⚪ sem alteração.
+            if fr.status == "failed":
+                icone = "🔴"
+            elif fr.status == "unchanged":
+                icone = "⚪"
+            elif fr.has_warnings:
+                icone = "🟡"
+            else:
+                icone = "🟢"
             item = QTreeWidgetItem([f"{icone} {fr.path}", _STATUS_LABEL.get(fr.status, fr.status)])
             item.setData(0, Qt.ItemDataRole.UserRole, fr)
+            tips = []
             if fr.error:
-                item.setToolTip(0, fr.error)
+                tips.append(fr.error)
             for mr in fr.modifications:
-                micone = "✓" if mr.ok else "✗"
-                filho = QTreeWidgetItem(
-                    [f"   {micone} {mr.mod_id} ({mr.strategy})", "" if mr.ok else "erro"]
-                )
-                if mr.error:
-                    filho.setToolTip(0, mr.error)
+                for w in mr.warnings:
+                    tips.append(f"⚠ {mr.mod_id}: {w}")
+            if tips:
+                item.setToolTip(0, "\n".join(tips))
+            for mr in fr.modifications:
+                if not mr.ok:
+                    micone, rotulo = "✗", "erro"
+                elif mr.warnings:
+                    micone, rotulo = "⚠", "ressalva"
+                else:
+                    micone, rotulo = "✓", ""
+                filho = QTreeWidgetItem([f"   {micone} {mr.mod_id} ({mr.strategy})", rotulo])
+                tip = mr.error or ("\n".join(mr.warnings) if mr.warnings else "")
+                if tip:
+                    filho.setToolTip(0, tip)
                 filho.setData(0, Qt.ItemDataRole.UserRole, fr)  # diff é por arquivo
                 item.addChild(filho)
             self.tree.addTopLevelItem(item)
@@ -705,7 +722,11 @@ class MainWindow(QMainWindow):
         m = sum(1 for f in report.files if f.status == "modified")
         u = sum(1 for f in report.files if f.status == "unchanged")
         x = sum(1 for f in report.files if f.status == "failed")
-        return f"{c} criado(s), {m} modificado(s), {u} inalterado(s), {x} falha(s)."
+        resumo = f"{c} criado(s), {m} modificado(s), {u} inalterado(s), {x} falha(s)."
+        if report.has_warnings:
+            n = sum(len(mr.warnings) for f in report.files for mr in f.modifications)
+            resumo = f"{resumo} (com {n} ressalva(s))"
+        return resumo
 
 
 def run(
