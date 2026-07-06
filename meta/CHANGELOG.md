@@ -7,6 +7,17 @@
 
 ---
 
+## [0.8.4] — 2026-07-06
+### Corrigido / Ajustado
+- **Validador com dica acionável (spec0003):** `instruction_validator._format_error` ganhou `_schema_error_hint` — quando o erro de schema é `minLength` em `location.before`/`after` (âncora vazia do `replace_context_block`), a mensagem passa a incluir uma segunda linha "Dica:" explicando que o bloco provavelmente toca a borda do arquivo e sugerindo `replace_line_pattern`/`insert_before_pattern`/`replace_section`/`replace_function` como alternativa. Chaveia por `error.validator` (estável), não pelo texto da mensagem. Origem: print do usuário 07-03.
+- **Rollback registrado no `history.log` (spec0003):** `backup_manager.rollback_from_dir` passa a chamar `_append_rollback_history` (best-effort) sempre que algo foi de fato revertido, gravando uma linha `rollback de <sessão> (N revertido(s))` no `history.log` do diretório-pai da sessão. Cobre os três caminhos que passam por `rollback_from_dir`: GUI (Desfazer), CLI (`rollback`) e `self-test`. Rollback automático em falha (`_maybe_rollback`) NÃO é registrado (nunca chegou a gravar linha de aplicação).
+### Documentação / Processo
+- **`docs/INSTRUCTION_GUIDE.md`:** nota na §4.1 sobre não usar `replace_context_block` na borda do arquivo + linha nova na tabela erro→correção (§6) para `minLength`/`non-empty` em `location.before`/`after`.
+### Testes / Qualidade
+- 2 testes novos (`test_validator_dica_ancora_vazia_no_context_block`, `test_rollback_registra_no_history`); suíte, `ruff`, `black` e `self-test` limpos. `__version__` 0.8.3 → **0.8.4**. Sem DEC nova (estende DEC-014/026 e DEC-018).
+
+---
+
 ## [0.8.3] — 2026-07-03
 ### Adicionado
 - **Canal de warnings não-fatais — DEC-028 (specs 0001+0002):** terceiro estado "aplicado com ressalva", entre sucesso e erro. No engine, `apply()` pode retornar `(str, list[str])` além de `str` (retrocompatível — não quebra as 13 estratégias); `split_apply_result` normaliza; `ModificationResult.warnings` + `FileResult.has_warnings`/`ApplyReport.has_warnings`. Piloto: `create_file` sobre arquivo existente avisa da sobrescrita. Na GUI, a árvore ganha 🟡 por arquivo (precedência 🔴 > 🟡 > 🟢 > ⚪) e ⚠ por modificação, com avisos no tooltip; Aplicar segue habilitado (ressalva não bloqueia); resumo mostra "(N ressalva(s))". Warning não altera `report.ok`, não aborta, não reverte.
