@@ -125,7 +125,38 @@ def _check_format_version(instruction: dict[str, Any]) -> list[str]:
     return []
 
 
+def _schema_error_hint(error: ValidationError) -> str | None:
+    """Dica acionável (porquê + conserto) para erros de schema comuns, ou ``None``.
+
+    Segue a filosofia de "erro acionável" (DEC-014/DEC-026): a mensagem crua do
+    jsonschema diz O QUE violou, mas não COMO consertar. Hoje cobre o caso mais
+    comum em instruções geradas por IA — âncora vazia (``minLength``) em
+    ``location.before``/``after`` do ``replace_context_block``, que quase sempre
+    significa que o bloco-alvo toca a borda do arquivo, onde essa estratégia não
+    serve. Chaveia pelo VALIDADOR (``minLength``), não pelo texto da mensagem,
+    para resistir a mudanças de wording entre versões do jsonschema.
+    """
+    campo = error.absolute_path[-1] if error.absolute_path else None
+    if error.validator == "minLength" and campo in ("before", "after"):
+        vizinha = "acima" if campo == "before" else "abaixo"
+        return (
+            f"a âncora '{campo}' está vazia. Use uma linha ASCII estável {vizinha} "
+            "do bloco. Se o bloco vai até a borda do arquivo (topo/fim), "
+            "'replace_context_block' não serve: prefira 'replace_line_pattern' ou "
+            "'insert_before_pattern' ancorando numa linha existente, ou a "
+            "estratégia própria do tipo ('replace_section' p/ Markdown, "
+            "'replace_function' p/ Python)."
+        )
+    return None
+
+
 def _format_error(error: ValidationError) -> str:
-    """Converte um erro do jsonschema em mensagem PT-BR com o caminho do campo."""
-    caminho = error.json_path  # ex.: "$.files[0].modifications[1].strategy"
-    return f"{caminho}: {error.message}"
+    """Converte um erro do jsonschema em mensagem PT-BR com o caminho do campo.
+
+    Quando há dica acionável para o erro (ver :func:`_schema_error_hint`),
+    acrescenta uma segunda linha indentada com o porquê + o conserto.
+    """
+    caminho = error.json_path  # ex.: "$.files[0].modifications[1].location.after"
+    base = f"{caminho}: {error.message}"
+    dica = _schema_error_hint(error)
+    return f"{base}\n      Dica: {dica}" if dica else base

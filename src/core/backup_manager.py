@@ -160,6 +160,30 @@ class BackupManager:
         return history
 
 
+def _append_rollback_history(session_dir: Path, n_reverted: int) -> None:
+    """Registra um rollback no ``history.log`` (best-effort).
+
+    O ``history.log`` fica no diretório-PAI da sessão — o que vale para os dois
+    layouts: ``backups/<ts>`` (padrão, DEC-024c) e ``<project_name>/<ts>``
+    (backup externo, DEC-024b). Assim o log cronológico deixa de conter só
+    aplicações (``BackupManager.append_history``) e passa a registrar também os
+    rollbacks manuais (Desfazer da GUI / ``rollback`` do CLI).
+
+    É best-effort DE PROPÓSITO: se a linha de log não puder ser escrita, o
+    rollback JÁ ocorreu e não deve ser abortado por causa do log — engolimos o
+    ``OSError`` em vez de estourar uma operação já concluída.
+    """
+    history = Path(session_dir).parent / "history.log"
+    now = datetime.now().strftime("%Y%m%d_%H%M%S")
+    linha = f"{now}\trollback de {Path(session_dir).name} ({n_reverted} revertido(s))\n"
+    try:
+        history.parent.mkdir(parents=True, exist_ok=True)
+        with history.open("a", encoding="utf-8") as fh:
+            fh.write(linha)
+    except OSError:
+        pass  # log é secundário ao rollback já concluído
+
+
 def rollback_from_dir(session_dir: Path) -> list[str]:
     """Desfaz uma sessao de backup dado o caminho completo do diretório de sessao.
 
@@ -209,6 +233,9 @@ def rollback_from_dir(session_dir: Path) -> list[str]:
             if original.exists():
                 original.unlink()
                 revertidos.append(f"removido: {original}")
+    if revertidos:
+        # Log cronológico: antes só continha aplicações; agora também rollbacks.
+        _append_rollback_history(session_dir, len(revertidos))
     return revertidos
 
 

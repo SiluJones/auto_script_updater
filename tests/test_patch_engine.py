@@ -545,6 +545,28 @@ def test_rollback_from_dir_backup_interno(tmp_path):
     assert (proj / "f.txt").read_text(encoding="utf-8") == "antigo\n"
 
 
+def test_rollback_registra_no_history(tmp_path):
+    """Um rollback manual acrescenta uma linha 'rollback de <ts>' ao history.log."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
+    instr = _instr([_txt_file("f.txt", _replace_file_mod("novo\n"))])
+    instr["description"] = "aplicacao 1"
+
+    report = apply_instruction(instr, root_path=proj, color=False)
+    session_dir = Path(report.backup_dir)
+    history = session_dir.parent / "history.log"
+    # Após a aplicação: 1 linha (a aplicação).
+    assert history.read_text(encoding="utf-8").count("\n") == 1
+
+    rollback_from_dir(session_dir)
+    conteudo = history.read_text(encoding="utf-8")
+    # Agora 2 linhas: a aplicação + o rollback.
+    assert conteudo.count("\n") == 2
+    assert f"rollback de {session_dir.name}" in conteudo
+    assert (proj / "f.txt").read_text(encoding="utf-8") == "antigo\n"
+
+
 def test_rollback_from_dir_backup_externo(tmp_path):
     """rollback_from_dir funciona com backup externo aninhado por projeto."""
     proj = tmp_path / "proj"

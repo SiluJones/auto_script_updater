@@ -147,6 +147,13 @@ um inteiro → `replace_file` (prefira o cirúrgico quando possível).
 As âncoras `before` e `after` **permanecem no arquivo**. Repeti-las no
 `new_content` é rejeitado pela ferramenta (duplicaria as linhas).
 
+**Não use na borda do arquivo:** se o bloco-alvo começa na 1ª linha ou termina
+na última, não há linha estável para `before`/`after`, e uma âncora vazia é
+rejeitada pelo schema (`location.after: '' should be non-empty`). Nesse caso
+ancore numa linha existente (`insert_before_pattern`/`replace_line_pattern`) ou
+use a estratégia do tipo (`replace_section` p/ Markdown, `replace_function` p/
+Python).
+
 ### 4.2 Copie as âncoras EXATAS do arquivo (indentação incluída)
 A falha nº 1 de geração é âncora com espaços/indentação diferentes do arquivo
 real (espaços onde o arquivo usa TAB, 4 espaços onde são 8…). A âncora é um
@@ -217,6 +224,7 @@ ASCII estável evita um round-trip de debug por um detalhe invisível.
 | `Encontrei um trecho parecido na linha X… indentação/os espaços diferem` | Âncora digitada com whitespace errado | Substitua a âncora pela linha exata indicada no erro |
 | `casou 0 vez(es)` numa âncora que tem seta/box-drawing/aspas curvas | Glifo não-ASCII na âncora não casou (encoding/cópia) | Reescreva a âncora em ASCII: `.*` no `pattern`, ou recorte `before`/`after` p/ texto ASCII vizinho (§4.7) |
 | `o new_content inclui as âncoras` | Miolo repetiu `before`/`after` | Remova as âncoras do `new_content` (deixe só o conteúdo entre elas) |
+| `location.before`/`after` + `non-empty`/`is too short`/`minLength` | Âncora `before`/`after` vazia (bloco toca a borda do arquivo) | Ancore numa linha existente (`insert_before_pattern`/`replace_line_pattern`) ou use `replace_section`/`replace_function`; `replace_context_block` não serve na borda |
 | `Âncora 'after' não encontrada depois de 'before'` | `after` não existe após o ponto, ou está antes | Escolha um `after` que ocorra DEPOIS do `before` no arquivo |
 | `Heading '…' não encontrado. Headings encontrados: …` | Heading digitado diferente | Use exatamente um dos headings listados |
 | `aparece N vezes no documento — localização ambígua` | Heading duplicado no MD | Peça ao usuário p/ tornar headings únicos, ou use outra estratégia |

@@ -139,3 +139,34 @@ def test_validator_replace_function_exige_name_no_location() -> None:
     with pytest.raises(InstructionValidationError) as info:
         validate(instrucao)
     assert "name" in str(info.value)
+
+
+def test_validator_dica_ancora_vazia_no_context_block() -> None:
+    """`after` vazio no replace_context_block → erro traz dica acionável de borda."""
+    instrucao = {
+        "format_version": "1.0",
+        "description": "teste",
+        "files": [
+            {
+                "id": "f1",
+                "path_mode": "relative",
+                "relative_path": "x.md",
+                "type": "text",
+                "modifications": [
+                    {
+                        "id": "m1",
+                        "description": "bloco que vai ate o fim do arquivo",
+                        "strategy": "replace_context_block",
+                        "location": {"before": "## Fim", "after": ""},
+                        "new_content": "novo miolo",
+                    }
+                ],
+            }
+        ],
+    }
+    with pytest.raises(InstructionValidationError) as info:
+        validate(instrucao)
+    msg = str(info.value)
+    assert "after" in msg
+    assert "Dica:" in msg
+    assert "replace_context_block" in msg
