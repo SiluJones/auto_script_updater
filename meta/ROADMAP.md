@@ -53,7 +53,7 @@
 
 **Itens estruturais restantes da F2 (próximo increment):**
 - [x] `src/gui/main_window.py` — janela principal, barra de menu, barra de status.
-- [x] Árvore de arquivos afetados com ícone de status por arquivo (🟢/🔴/⚪) e por modificação (✓/✗) — integrada na main_window; o 🟡 aguarda o canal de warnings (IDEAS).
+- [x] Árvore de arquivos afetados com ícone de status por arquivo (🟢/🟡/🔴/⚪) e por modificação (✓/⚠/✗) — integrada na main_window; **o 🟡 "aplicado com ressalva" chegou (0.8.3, specs 0001+0002): canal de warnings não-fatais no engine + indicador na GUI.**
 - [~] Diff colorido por arquivo integrado na main_window (HTML, verde/vermelho); syntax highlight por linguagem ainda pendente.
 - [~] Seletor de raiz lembra o ÚLTIMO uso (QSettings); recentes+fixadas chegam no increment ativo acima.
 - [ ] Barra de progresso durante aplicação de instruções com muitos arquivos.

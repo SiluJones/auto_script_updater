@@ -27,38 +27,38 @@ Apesar do nome ("Scripts"), a ferramenta modifica QUALQUER arquivo de texto — 
 ```
 auto_script_updater/
 ├── src/
-│   ├── __init__.py                    # __version__ (atual: "0.8.0")
+│   ├── __init__.py                    # __version__ (atual: "0.8.3")
 │   ├── __main__.py                    # CLI: validate | apply | self-test | rollback
 │   ├── core/
 │   │   ├── instruction_parser.py      # load_instruction / load_instruction_from_string; _StrictLoader (rejeita YAML duplicado)
 │   │   ├── instruction_validator.py   # validate() contra JSON Schema + _check_unique_ids
 │   │   ├── file_locator.py            # resolve_path (relative/absolute), ensure_ready, guarda de contenção
-│   │   ├── patch_engine.py            # ORQUESTRADOR: apply_instruction(); transação + rollback; make_sandbox + SandboxError + SANDBOX_IGNORES
+│   │   ├── patch_engine.py            # ORQUESTRADOR: apply_instruction(); transação + rollback; make_sandbox + SandboxError + SANDBOX_IGNORES; ModificationResult.warnings + has_warnings (DEC-028)
 │   │   ├── backup_manager.py          # BackupManager (espelho relativo à raiz — FIX-008), manifest.txt, history.log, rollback_session
 │   │   └── diff_renderer.py           # unified diff colorido (colorama) p/ prévia e output
 │   ├── strategies/
 │   │   ├── __init__.py                # REGISTRY das 13 estratégias + get_strategy()
-│   │   ├── base_strategy.py           # BaseStrategy (ABC), StrategyError, get_location()
+│   │   ├── base_strategy.py           # BaseStrategy (ABC), StrategyError, get_location(); split_apply_result — retorno opcional (str | (str, list[str])) p/ warnings (DEC-028)
 │   │   ├── python_strategy.py         # libcst: replace_function / replace_method / replace_class
-│   │   ├── text_strategy.py           # regex/contexto: insert_after/before_pattern, replace_line_pattern, replace_context_block, replace_section; _whitespace_hint (DEC-014)
+│   │   ├── text_strategy.py           # regex/contexto: insert_after/before_pattern, replace_line_pattern, replace_context_block, replace_section; _whitespace_hint (DEC-014) + _substring_hint/_already_applied_hint/_anchor_hints (DEC-026)
 │   │   ├── json_strategy.py           # navegador próprio: set/append/delete_json_path; _detect_style (FIX-004); _MISSING (FIX-005)
 │   │   └── file_strategy.py           # create_file / replace_file (DEC-008)
 │   ├── gui/
 │   │   ├── __init__.py
 │   │   ├── __main__.py                # `python -m src.gui` (argparse: --root/--instruction-dir/--instruction → run() → MainWindow)
-│   │   ├── main_window.py            # GUI (uma janela): MainWindow — preview/aplicar/desfazer/colar/copiar-erro/sandbox; recentes+fixadas; campo Backup; 2 botões de gerar .bat
+│   │   ├── main_window.py            # GUI (uma janela): MainWindow — preview/aplicar/desfazer/colar/copiar-erro/sandbox; recentes+fixadas; campo Backup; 2 botões de gerar .bat; árvore 🟢/🟡/🔴/⚪ + ✓/⚠/✗ (DEC-028)
 │   │   └── launcher.py               # PURO (sem Qt): resolve_instruction_in_dir (escaneia topo da pasta) + build_launcher_bat (por projeto) + build_open_gui_bat (clássico)
 │   └── schemas/
 │       └── instruction_v1.schema.json # JSON Schema — contrato do arquivo de instrução (format_version)
-├── tests/
+├── tests/                             # ~144 funções test_ (0.8.3); pytest + pytest-qt, ruff/black limpos
 │   ├── test_strategies.py             # unitários por strategy
-│   ├── test_edge_cases.py             # bordas: FIX-001..006, dica de whitespace
+│   ├── test_edge_cases.py             # bordas: FIX-001..006, dicas de âncora (whitespace/substring/já-aplicado — DEC-014/026)
 │   ├── test_multilang.py              # C#, C++, Java, JSX, TSX, GDScript via type:text
-│   ├── test_patch_engine.py           # integração: ciclo completo + sandbox + backup_location/history
+│   ├── test_patch_engine.py           # integração: ciclo completo + sandbox + backup_location/history + canal de warnings (DEC-028)
 │   ├── test_instruction_parser.py     # parser + validator (inclui anti-duplicata)
-│   └── test_gui_smoke.py              # GUI offscreen: preview→aplicar→desfazer, fingerprint, sandbox
+│   └── test_gui_smoke.py              # GUI offscreen: preview→aplicar→desfazer, fingerprint, sandbox, indicador 🟡 (DEC-028)
 ├── docs/
-│   ├── INSTRUCTION_GUIDE.md           # kit de ensino da IA (autocontido): formato, 13 estratégias, 6 regras de ouro, tabela erro→correção, §8 verificação
+│   ├── INSTRUCTION_GUIDE.md           # kit de ensino da IA (autocontido): formato, 13 estratégias, regras de ouro (incl. §4.7 âncoras em ASCII), tabela erro→correção, §8 verificação pós-aplicação
 │   └── PROMPT_IA.md                   # bloco para colar nas instruções de projetos consumidores
 ├── examples/
 │   ├── demo.yaml                      # instrução de demo (CRIA src/health.py via create_file — gitignored, FIX-009)
@@ -69,7 +69,7 @@ auto_script_updater/
 └── .gitignore                         # ignora backups/, examples/demo_project/src/health.py, *_sandbox_*/
 
 # NÃO versionados no Projeto (vivem no Git): logs/AAAA-MM-DD.md (logs de sessão).
-# Docs de contexto (meta/): CEREBRO (ex-CLAUDE), CONTEXT, STATUS, DECISIONS, CHANGELOG, IDEAS, ROADMAP, GLOSSARY, HISTORY, LOG-TEMPLATE.
+# Docs de contexto (meta/): CEREBRO (ex-CLAUDE), CONTEXT, STATUS, DECISIONS, DECISIONS-archive (fundacionais F0–F1), CHANGELOG, IDEAS, ROADMAP, GLOSSARY, HISTORY (ex-HISTORICO), LOG-TEMPLATE.
 # Raiz do repo (modo Claude Code): CLAUDE.md (ponteiro curto p/ o Code) + .claude/ (settings.json + commands/). HUB.md do toolchain vive na pasta-raiz comum aos 3 projetos (não dentro deste repo).
 ```
 
@@ -126,14 +126,14 @@ instrução
 - Fluxo recomendado: `validate` → `apply --dry-run` (revisa diff) → `apply` (confirma s/N, cria backup, imprime `Backup: ...\<TIMESTAMP>` e `Histórico: ...\history.log`) → `rollback <TIMESTAMP>`.
 - `self-test`: aplica a demo embutida num tempdir, confere e reverte (nada do disco é tocado).
 
-**GUI:** `python -m src.gui` (camada FINA sobre a mesma pilha do CLI — DEC-013). Aceita argumentos de lançamento (`--root`, `--instruction-dir`, `--instruction`) para abrir já apontada a um projeto (DEC-022). Botões: Pré-visualizar (dry-run; árvore 🟢/🔴/⚪ + diff colorido), Aplicar (backup), Desfazer, Colar instrução (clipboard), Copiar erro para a IA; checkbox "Aplicar em sandbox". Campos: Raiz (com menu "Recentes ▾" até 8 + botão 📌 fixar — DEC-022), Instrução, **Backup** (opcional, expõe `--backup-dir` — DEC-024). Dois botões de atalho: "Criar atalho .bat…" (por projeto, pré-preenche raiz+instrução) e "Criar atalho .bat (abrir GUI)…" (clássico, só abre — DEC-023). Estado entre prévia/aplicação/desfazer protegido (FIX-007: fingerprint SHA-256 + raiz capturada).
+**GUI:** `python -m src.gui` (camada FINA sobre a mesma pilha do CLI — DEC-013). Aceita argumentos de lançamento (`--root`, `--instruction-dir`, `--instruction`) para abrir já apontada a um projeto (DEC-022). Botões: Pré-visualizar (dry-run; árvore 🟢/🟡/🔴/⚪ por arquivo + ✓/⚠/✗ por modificação, com o 🟡/⚠ vindo do canal de warnings — DEC-028; diff colorido), Aplicar (backup), Desfazer, Colar instrução (clipboard), Copiar erro para a IA; checkbox "Aplicar em sandbox". Campos: Raiz (com menu "Recentes ▾" até 8 + botão 📌 fixar — DEC-022), Instrução, **Backup** (opcional, expõe `--backup-dir` — DEC-024). Dois botões de atalho: "Criar atalho .bat…" (por projeto, pré-preenche raiz+instrução) e "Criar atalho .bat (abrir GUI)…" (clássico, só abre — DEC-023). Estado entre prévia/aplicação/desfazer protegido (FIX-007: fingerprint SHA-256 + raiz capturada).
 
 ## Arquitetura — Pontos-chave (ver DECISIONS para o porquê)
 - Padrão Strategy (ABC) por tipo de arquivo — DEC-002.
 - libcst (não ast) para Python — DEC-003.
 - YAML como formato canônico — DEC-004.
 - PySide6 como GUI — DEC-005.
-- Backup obrigatório + rollback atômico — DEC-006; espelho relativo à raiz — FIX-008; local configurável + history.log — DEC-018; exposto na GUI + aninhado por projeto quando externo — DEC-024; `rollback_from_dir` aceita o caminho da sessão. **Padrão do backup migrando para a pasta-PAI da raiz — DEC-024(c), a implementar.**
+- Backup obrigatório + rollback atômico — DEC-006; espelho relativo à raiz — FIX-008; local configurável + history.log — DEC-018; exposto na GUI + aninhado por projeto quando externo — DEC-024; `rollback_from_dir` aceita o caminho da sessão. **Padrão do backup é a pasta-PAI da raiz — DEC-024c (implementado em 0.8.1).**
 - Schema versionado (`format_version`) — DEC-007.
 - `create_file`/`replace_file` unificam criar e patchar — DEC-008.
 - `strategy` é fonte única do `location`; interface `apply()` única — DEC-009.
@@ -141,10 +141,13 @@ instrução
 - Unicidade implícita de localizadores (ambíguo sem `occurrence` = erro) — DEC-011.
 - Kit de ensino da IA como artefato do produto — DEC-012.
 - GUI fina sobre a pilha; confiança via dry-run — DEC-013.
-- Erro acionável, nunca fuzzy silencioso — DEC-014.
+- Erro acionável, nunca fuzzy silencioso — DEC-014; dicas de âncora "já aplicado" (substring + presença do new_content), sem ledger — DEC-026; âncoras em ASCII (guia §4.7) — parte da DEC-026.
 - Sandbox como cópia irmã (CLI e GUI; lógica no core) — DEC-015 + DEC-019.
 - Verificação pós-aplicação pela IA (outcome-based, lê o disco) — DEC-016.
 - Dois canais de feedback: Kit (no IDEAS) × ASU (DEC/FIX/IDEAS) — DEC-017.
+- ASU edita arquivo existente; arquivo novo entrega-se para baixar (exceto bundle com edições) — DEC-025.
+- Canal de warnings não-fatais: terceiro estado "aplicado com ressalva" (engine `apply()` opcional em tupla + `ModificationResult.warnings`; GUI 🟡/⚠) — DEC-028.
+- Integração da 2ª atualização do KCM: config-no-Code, convenção de spec `AAMMDD-specNNNN-desc.md`, HISTORICO→HISTORY, painel — DEC-027.
 
 ## Armadilhas Conhecidas
 1. **Número de linha como localizador** — linhas se deslocam após inserções/deleções; usar semântico ou janela de contexto (DEC-001).

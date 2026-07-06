@@ -368,3 +368,27 @@ O KCM lançou uma segunda atualização, desta vez com o conjunto completo de `*
 - CEREBRO cresceu ~2 linhas (config-no-Code) e teve a convenção de spec trocada; `HISTORICO`→`HISTORY` numa referência. HUB e seção «Desenvolvimento no Claude Code» preservados na versão rica do projeto (não regredidos ao molde genérico do kit — reforça o Feedback ao Kit de 06-19/06-30 sobre a seção de HUB genérica).
 - Documentação de usuário (README/GUIA) saiu da pendência herdada — atualizada nesta sessão.
 - Feedback ao Kit registrado (IDEAS): a geração do template-update depende dos modos ligados (a 1ª tentativa saiu com modo errado); a seção de HUB do kit ainda vem no molde de "grupo de conteúdo".
+
+---
+
+## DEC-028 — Canal de warnings: terceiro estado "aplicado com ressalva" (engine + GUI)
+**Data:** 2026-07-03 · **Status:** aceita · **Origem:** specs `260703-spec0001-canal-warnings-engine.md` e `260703-spec0002-indicador-amarelo-gui.md` (fase F2). Commits `fd80104` (engine) e `d2e187a` (GUI).
+
+### Contexto
+Até aqui o engine era binário por modificação: `strategy.apply()` devolvia a string nova (sucesso) ou levantava `StrategyError` (falha → aborta/reverte). Faltava um terceiro estado para "aplicou, mas com uma ressalva que o usuário deve ver" — casos como `create_file` sobrescrevendo um arquivo existente, ou (futuro) âncora casada por fuzzy de whitespace. Essas ressalvas ou viravam erro (drástico demais) ou passavam caladas (informação perdida). A GUI já tinha 🟢/🔴/⚪ mas o 🟡 não tinha dado que o alimentasse.
+
+### Decisão
+Criar um **canal de warnings não-fatais** que sobe pelo engine e chega à GUI, em duas camadas:
+1. **Engine (spec0001):** o retorno de `apply()` passa a ser **opcional em tupla** — `str` (como antes) OU `(str, list[str])` quando a estratégia quer avisar. `split_apply_result` normaliza. `ModificationResult.warnings` carrega os avisos; `FileResult.has_warnings`/`ApplyReport.has_warnings` derivam a presença. O laço do engine coleta. **Um piloto** real: `create_file` sobre arquivo existente emite aviso de sobrescrita. O warning NÃO altera `report.ok`, NÃO aborta, NÃO reverte.
+2. **GUI (spec0002):** a árvore ganha 🟡 por arquivo (precedência 🔴 > 🟡 > 🟢 > ⚪) e ⚠ por modificação, com os avisos no tooltip. O botão Aplicar permanece habilitado (ressalva não bloqueia). Resumo da barra indica "(N ressalva(s))".
+
+### Alternativas consideradas
+- **Mudar a assinatura de `apply()` para sempre retornar tupla** — descartado: quebraria as 13 estratégias e todos os seus testes. O retorno opcional é retrocompatível — estratégias que não avisam continuam devolvendo `str` puro.
+- **Emitir warnings em massa nas 13 estratégias já** — descartado: o canal nasce com UM piloto testável; emissões adicionais entram sob demanda, cada uma com seu teste (follow-up no IDEAS).
+- **Fazer o 🟡 na GUI primeiro** — impossível: sem o canal produzindo/carregando avisos, o 🟡 não teria o que exibir. Ordem correta: cano (0001) antes da torneira (0002).
+
+### Consequências
+- Preserva a filosofia DEC-014 (erro = dica acionável): o warning é o degrau ANTES do erro, para casos onde aplicar é aceitável mas o usuário merece saber. Coexiste com o binário sucesso/erro sem alterá-lo.
+- `patch_engine.py` e `base_strategy.py` ganham o mecanismo; `main_window.py` passa a exibir 🟡/⚠. ~11 testes novos (specs 0001+0002); suíte em ~144 funções `test_`, verdes; ruff/black limpos.
+- Base para futuras ressalvas (fuzzy de whitespace no caminho de sucesso, `occurrence` implícito, âncora Unicode-adjacente) sem novo encanamento — só emitir.
+- `__version__` 0.8.2 → **0.8.3**.

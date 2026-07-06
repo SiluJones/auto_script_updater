@@ -4,12 +4,20 @@
 > **Cresce**: entradas novas no topo. Registra só o que foi de fato concluído/entregue.
 
 ## [Não lançado]
-### Documentação / Processo (2026-07-03 — sem mudança de código)
-- **README.md** reescrito para 0.8.2 (backup padrão na pasta-pai, `--backup-dir`, `history.log`, GUI completa, 13 estratégias, encodings, quando-usar-ASU).
-- **GUIA_PASSO_A_PASSO.md** criado (ideia-260614): local do `instrucao.yaml`, subir o `PROMPT_IA.md` ao projeto, `--backup-dir`/`history.log`/sandbox, `--no-backup`.
+
+---
+
+## [0.8.3] — 2026-07-03
+### Adicionado
+- **Canal de warnings não-fatais — DEC-028 (specs 0001+0002):** terceiro estado "aplicado com ressalva", entre sucesso e erro. No engine, `apply()` pode retornar `(str, list[str])` além de `str` (retrocompatível — não quebra as 13 estratégias); `split_apply_result` normaliza; `ModificationResult.warnings` + `FileResult.has_warnings`/`ApplyReport.has_warnings`. Piloto: `create_file` sobre arquivo existente avisa da sobrescrita. Na GUI, a árvore ganha 🟡 por arquivo (precedência 🔴 > 🟡 > 🟢 > ⚪) e ⚠ por modificação, com avisos no tooltip; Aplicar segue habilitado (ressalva não bloqueia); resumo mostra "(N ressalva(s))". Warning não altera `report.ok`, não aborta, não reverte.
+### Documentação / Processo
+- **README.md** reescrito para 0.8.x (backup padrão na pasta-pai, `--backup-dir`, `history.log`, GUI completa, 13 estratégias, encodings, quando-usar-ASU) e **GUIA_PASSO_A_PASSO.md** criado (ideia-260614).
 - **DECISIONS arquivado** — DEC-001..012 + FIX-001..006 → `meta/DECISIONS-archive.md` (o principal passou de 715 linhas). Numeração preservada.
-- **2ª atualização do KCM integrada — DEC-027:** config-no-Code no CEREBRO, convenção de spec do KCM (`AAMMDD-specNNNN-desc.md` / `AAMMDD-asuNNNN.yaml`), `HISTORICO.md`→`HISTORY.md`, painel (Instruções do Projeto) atualizado.
-- **HUB.md** atualizado (status relâmpago do ASU → 0.8.2).
+- **2ª atualização do KCM integrada — DEC-027:** config-no-Code no CEREBRO, convenção de spec do KCM (`AAMMDD-specNNNN-desc.md` / `AAMMDD-asuNNNN.yaml`), `HISTORICO.md`→`HISTORY.md` (via `git mv`, refs em README/CONTEXT ajustadas), painel (Instruções do Projeto) atualizado.
+- **HUB.md** atualizado (status relâmpago do ASU → 0.8.x; 3 itens abertos na caixa do KCM).
+- `black` reinstalado no ambiente do Claude Code (via `requirements-dev.txt`); `black --check .` limpo nos 27 arquivos.
+### Testes / Qualidade
+- Suíte em ~144 funções `test_` (133 + specs 0001/0002); `ruff`/`black`/`self-test` limpos. `__version__` 0.8.2 → **0.8.3**.
 
 ---
 

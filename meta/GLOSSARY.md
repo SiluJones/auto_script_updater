@@ -51,7 +51,7 @@
 
 - **diff_renderer** — Módulo que gera unified diff legível entre conteúdo original e conteúdo resultante de cada arquivo. Usado para prévia na GUI e output no CLI.
 
-- **BaseStrategy** — Classe abstrata (ABC) que define a interface comum a toda strategy: um único método `apply(source, modification) -> str` que **localiza e aplica** a modificação num passo (DEC-009). Importada pelo `patch_engine` via registry para seleção dinâmica. *(Nota: a separação conceitual `find_location()`/`apply()` da F0 foi unificada em `apply()`; a pré-checagem de confiança da GUI virá do dry-run por modificação.)*
+- **BaseStrategy** — Classe abstrata (ABC) que define a interface comum a toda strategy: um único método `apply(source, modification) -> str` que **localiza e aplica** a modificação num passo (DEC-009). Pode, opcionalmente, retornar `(str, list[str])` para emitir avisos não-fatais (DEC-028; normalizado por `split_apply_result`). Importada pelo `patch_engine` via registry para seleção dinâmica. *(Nota: a separação conceitual `find_location()`/`apply()` da F0 foi unificada em `apply()`; a pré-checagem de confiança da GUI virá do dry-run por modificação.)*
 
 - **python_strategy** — Strategy para arquivos `.py` usando `libcst`. Suporta: `replace_function`, `replace_method`, `replace_class`.
 
@@ -73,7 +73,7 @@
 
 - **`backups/history.log`** — (DEC-018) Arquivo append-only, um por pasta de backups, com uma linha por aplicação: `timestamp<TAB>N modificado(s), N criado(s)  descrição`. Leitura humana cronológica; complementar ao manifesto (não substitui, não é fonte de rollback).
 
-- **`--backup-dir PASTA`** — (DEC-018) Flag do `apply`/`rollback` que define ONDE criar a pasta `backups/` (padrão: a raiz do projeto). Permite manter o backup fora do projeto. Exposto na GUI no campo "Backup:" (DEC-024). Quando aponta para fora da raiz, o backup é aninhado por projeto: `<dir>/<nome-da-raiz>/<timestamp>/` (DEC-024b). **Padrão migrando para a pasta-PAI da raiz — DEC-024c, a implementar.**
+- **`--backup-dir PASTA`** — (DEC-018) Flag do `apply`/`rollback` que define ONDE criar a pasta `backups/`. Exposto na GUI no campo "Backup:" (DEC-024). Quando aponta para fora da raiz, o backup é aninhado por projeto: `<dir>/<nome-da-raiz>/<timestamp>/` (DEC-024b). **Padrão (sem flag): a pasta-PAI da raiz — `parent(root)/backups/<ts>/` — DEC-024c, implementado em 0.8.1; mantém o repositório limpo. O `rollback` sem flag procura no mesmo lugar.**
 
 - **`launcher.py` (gui)** — Módulo PURO (sem Qt), testável isoladamente, com as funções dos atalhos `.bat`: `resolve_instruction_in_dir` (escaneia só o TOPO de uma pasta atrás de YAMLs → `one`/`none`/`many`, ignorando subpastas), `build_launcher_bat` (gera o `.bat` por projeto: python do venv direto, `--root` relativo/absoluto, `--instruction-dir "%~dp0."`, `chcp 65001`+UTF-8 quando algum caminho tem acento) e `build_open_gui_bat` (gera o `.bat` clássico "abrir GUI": `pythonw`+`start "" /d`, sem console). DEC-022/023.
 
@@ -99,3 +99,7 @@
 - **`backup_location` × `root_path`** — Parâmetros distintos de `apply_instruction`: `root_path` é a base dos caminhos relativos (e encurta o espelho — FIX-008); `backup_location` é só onde a pasta `backups/` mora (DEC-018). Por padrão são iguais.
 - **`_MISSING`** — Sentinela do `json_strategy._walk` que distingue "chave ausente" de "valor `null`" (FIX-005), permitindo deletar chaves nulas.
 - **`SandboxError`** — Exceção do core levantada por `make_sandbox` quando a instrução tem `path_mode=absolute` (que escaparia da cópia). O CLI a traduz em stderr + exit 2; a GUI mostra um diálogo.
+
+- **Warning / aviso não-fatal** — (DEC-028) Terceiro estado de uma modificação, entre sucesso e erro: **aplicou, mas com uma ressalva** que o usuário deve ver (ex.: `create_file` sobrescrevendo um arquivo existente). Não aborta, não reverte, não altera `report.ok`. Carregado por `ModificationResult.warnings`; a presença agregada é derivada por `FileResult.has_warnings`/`ApplyReport.has_warnings`. Na GUI aparece como 🟡 (arquivo) / ⚠ (modificação) com o texto no tooltip.
+
+- **`split_apply_result`** — (DEC-028) Helper de `base_strategy` que normaliza o retorno de `apply()`: aceita `str` (sem avisos, como antes) OU `(str, list[str])` (com avisos) e sempre devolve `(texto, avisos)`. Torna o canal de warnings retrocompatível — as 13 estratégias que não avisam seguem retornando `str` puro.
