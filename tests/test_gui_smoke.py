@@ -20,7 +20,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")  # roda sem servidor gráf
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from src.core.patch_engine import ApplyReport, FileResult, ModificationResult  # noqa: E402
-from src.gui.main_window import MainWindow, _diff_to_html  # noqa: E402
+from src.gui.main_window import MainWindow, _diff_to_html, _report_to_text  # noqa: E402
 
 _REPO = Path(__file__).resolve().parent.parent
 
@@ -442,3 +442,41 @@ def test_aplicar_habilitado_com_ressalva(app, demo_root):
     assert win._preview_report.has_warnings is True
     assert win.btn_apply.isEnabled()
     assert win.tree.topLevelItem(0).text(0).startswith("🟡")
+
+
+def test_report_to_text_despeja_relatorio_inteiro():
+    """_report_to_text inclui status, avisos, erros e o diff — sucesso e falha."""
+    report = ApplyReport(
+        ok=False,
+        dry_run=True,
+        files=[
+            FileResult(
+                file_id="f1",
+                path="src/x.py",
+                status="modified",
+                diff="--- a\n+++ b\n-old\n+new\n",
+                modifications=[
+                    ModificationResult(
+                        "m1", "replace_function", ok=True, warnings=["match por whitespace"]
+                    )
+                ],
+            ),
+            FileResult(
+                file_id="f2",
+                path="src/y.py",
+                status="failed",
+                error="Modificacao 'm2' falhou",
+                modifications=[
+                    ModificationResult(
+                        "m2", "replace_line_pattern", ok=False, error="casou 0 vez(es)"
+                    )
+                ],
+            ),
+        ],
+    )
+    texto = _report_to_text(report)
+    assert "FALHOU" in texto
+    assert "src/x.py" in texto and "src/y.py" in texto
+    assert "aviso: match por whitespace" in texto
+    assert "casou 0 vez(es)" in texto
+    assert "+new" in texto  # o diff entra na saida

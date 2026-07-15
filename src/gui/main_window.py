@@ -81,6 +81,40 @@ def _diff_to_html(diff: str) -> str:
     return f'<pre style="font-family:Consolas,monospace;font-size:10pt">{corpo}</pre>'
 
 
+def _report_to_text(report: ApplyReport) -> str:
+    """Serializa um ApplyReport COMPLETO em texto plano para a área de transferência.
+
+    Diferente de ``copy_errors_for_ai`` (que só junta os erros para a IA), aqui o
+    relatório inteiro é despejado — todos os arquivos, status, avisos e diffs,
+    tanto no sucesso quanto na falha. Marcadores em ASCII (`!`/`~`/`-`) para colar
+    limpo em qualquer lugar. Função pura (sem Qt) → testável isoladamente.
+    """
+    modo = "Prévia (dry-run)" if report.dry_run else "Aplicação"
+    situacao = "OK" if report.ok else "FALHOU"
+    linhas: list[str] = [f"=== ASU — {modo}: {situacao} ==="]
+    if report.rolled_back:
+        linhas.append("(escritas revertidas pelo rollback)")
+    if report.backup_dir:
+        linhas.append(f"Backup: {report.backup_dir}")
+    linhas.append("")
+    for fr in report.files:
+        marca = "!" if fr.status == "failed" else ("~" if fr.has_warnings else "-")
+        linhas.append(f"[{marca}] {fr.status.upper()}  {fr.path}  (id: {fr.file_id})")
+        if fr.error:
+            linhas.append(f"    erro: {fr.error}")
+        for mr in fr.modifications:
+            estado = "OK" if mr.ok else "FALHOU"
+            linhas.append(f"    - {mr.mod_id}/{mr.strategy}: {estado}")
+            for aviso in mr.warnings:
+                linhas.append(f"        aviso: {aviso}")
+            if mr.error:
+                linhas.append(f"        erro: {mr.error}")
+        if fr.diff:
+            linhas.append(fr.diff.rstrip("\n"))
+        linhas.append("")
+    return "\n".join(linhas).rstrip("\n") + "\n"
+
+
 class MainWindow(QMainWindow):
     """Janela única do ASU: prévia, aplicação e rollback de instruções."""
 
@@ -105,6 +139,7 @@ class MainWindow(QMainWindow):
         # Texto colado da área de transferência (instrução em memória).
         self._pasted_text: str | None = None
         self._last_errors: list[str] = []  # alimenta "Copiar erro para a IA"
+        self._last_report: ApplyReport | None = None  # alimenta "Copiar saída"
         self._settings = QSettings("auto-script-updater", "gui")
         # Pasta-inicial do seletor de instrução (definida por --instruction-dir).
         self._instruction_start_dir: str | None = None
@@ -155,6 +190,13 @@ class MainWindow(QMainWindow):
         )
         self.btn_copy_err.setEnabled(False)
         self.btn_copy_err.clicked.connect(self.copy_errors_for_ai)
+        self.btn_copy_out = QPushButton("Copiar saída")
+        self.btn_copy_out.setToolTip(
+            "Copia o relatório COMPLETO da última prévia/aplicação (todos os arquivos, "
+            "status, avisos e diffs) para a área de transferência."
+        )
+        self.btn_copy_out.setEnabled(False)
+        self.btn_copy_out.clicked.connect(self.copy_output)
         self.btn_bat = QPushButton("Criar atalho .bat…")
         self.btn_bat.setToolTip(
             "Gera um .bat que reabre a GUI já apontada para este projeto (python do venv direto)."
@@ -204,6 +246,7 @@ class MainWindow(QMainWindow):
         acoes.addWidget(self.btn_apply)
         acoes.addWidget(self.btn_undo)
         acoes.addWidget(self.btn_copy_err)
+        acoes.addWidget(self.btn_copy_out)
         acoes.addWidget(self.btn_bat)
         acoes.addWidget(self.btn_gui_bat)
         self.chk_sandbox = QCheckBox("Aplicar em sandbox (cópia)")
@@ -578,6 +621,14 @@ class MainWindow(QMainWindow):
             f"{len(self._last_errors)} erro(s) copiados — cole na conversa com a IA geradora."
         )
 
+    def copy_output(self) -> None:
+        """Copia o relatório COMPLETO (sucesso ou falha) para a área de transferência."""
+        if self._last_report is None:
+            return
+        QApplication.clipboard().setText(_report_to_text(self._last_report))
+        n = len(self._last_report.files)
+        self.statusBar().showMessage(f"Saída copiada — {n} arquivo(s) no relatório.")
+
     # ── Gerador de atalho por projeto (WI-4) ──────────────────────────────
     def _create_launcher_bat(self) -> None:
         """Gera um .bat que reabre a GUI já apontada para o projeto atual."""
@@ -664,6 +715,9 @@ class MainWindow(QMainWindow):
 
     # ── Apresentação ───────────────────────────────────────────────────────
     def _populate_tree(self, report: ApplyReport) -> None:
+        # Guarda o último relatório para o botão "Copiar saída" (sucesso E falha).
+        self._last_report = report
+        self.btn_copy_out.setEnabled(True)
         self.tree.clear()
         for fr in report.files:
             # 🔴 falha > 🟡 aplicável com ressalva > 🟢 aplicável limpo > ⚪ sem alteração.
