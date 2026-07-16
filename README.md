@@ -9,10 +9,10 @@ aplica com um comando — ou pela interface gráfica.
 > Documentação de contexto completa (visão, arquitetura, decisões, armadilhas):
 > ver `meta/CONTEXT.md`, `meta/DECISIONS.md` e `meta/ROADMAP.md`.
 
-## Estado atual — 0.8.2
+## Estado atual — 0.8.5
 
 O núcleo (CLI) e a interface gráfica (PySide6) estão funcionais e testados
-(**133 testes**). A GUI reusa exatamente a mesma pilha do CLI
+(**147 testes**). A GUI reusa exatamente a mesma pilha do CLI
 (`parser → validator → engine`), sem lógica própria.
 
 Implementado:
@@ -29,12 +29,22 @@ Implementado:
 - **Backup obrigatório** timestampado + **rollback** atômico (automático em falha
   e manual por timestamp). Por padrão o backup vai para **fora do repositório**
   (`parent(raiz)/backups/<timestamp>/`); configurável via `--backup-dir`.
-- Log consolidado `history.log` (uma linha por aplicação).
+- Log consolidado `history.log`: uma linha por aplicação **e também por rollback
+  manual** (Desfazer na GUI, `rollback` no CLI, `self-test`).
+- **Canal de avisos não-fatais ("ressalva")** — um terceiro estado, *aplicado com
+  ressalva*, entre sucesso e erro (ex.: `create_file` sobre um arquivo que já
+  existe avisa da sobrescrita). O aviso **não aborta nem reverte** a aplicação; na
+  GUI aparece como 🟡 na árvore (DEC-028).
+- **Dica acionável do validador** quando a âncora de um `replace_context_block`
+  fica vazia por tocar a borda do arquivo: a mensagem sugere alternativas
+  (`replace_line_pattern`, `insert_before_pattern`, `replace_section`,
+  `replace_function`).
 - Renderização de diff colorido (unified diff).
 - CLI com `validate`, `apply` (prévia + confirmação), `rollback`, `self-test`,
   `--sandbox`.
 - GUI: recentes/fixadas, atalhos `.bat` por projeto, campo de backup, colar
-  instrução da área de transferência, copiar erro para a IA.
+  instrução da área de transferência, copiar erro para a IA, **copiar a saída
+  completa** da prévia/aplicação, e o indicador de ressalva 🟡.
 - Encodings seguros: BOM UTF-8 preservado (roundtrip com Visual Studio); cp1252
   e CRLF preservados; UTF-16/32 rejeitados com erro claro.
 - Multilinguagem comprovada por teste (C#, C++, Java, JSX, TSX, GDScript).
@@ -111,14 +121,21 @@ python -m src.gui
 ```
 
 Escolha a raiz e a instrução, clique **Pré-visualizar (dry-run)** para ver a
-árvore de arquivos (🟢 ok / 🔴 falha, com cada modificação ✓/✗) e o diff
-colorido, depois **Aplicar** (cria backup) ou **Desfazer última aplicação**.
+árvore de arquivos e o diff colorido, depois **Aplicar** (cria backup) ou
+**Desfazer última aplicação**. A árvore usa 🟢 (ok) / 🔴 (falha) / ⚪ (inalterado)
+por arquivo, com cada modificação marcada ✓/✗; quando uma aplicação passa **com
+ressalva** (ver o canal de avisos abaixo), o arquivo aparece como 🟡 e a
+modificação como ⚠, com o texto do aviso no tooltip (precedência 🔴 > 🟡 > 🟢 > ⚪).
 Recursos de conveniência:
 - **Recentes ▾** (até 8) e botão **📌** para fixar as raízes que você mais usa.
 - Campo **Backup:** para escolher onde o backup é criado (expõe o `--backup-dir`).
 - **Colar instrução** — lê o YAML direto da área de transferência, sem salvar arquivo.
 - **Copiar erro para a IA** — em falha, copia um bloco pronto (erro + referência
   do guia) para colar na IA geradora e corrigir a instrução.
+- **Copiar saída** — copia o relatório **completo** da última prévia/aplicação
+  (todos os arquivos, status, avisos 🟡 e diffs), tanto em **sucesso** quanto em
+  **falha**. Complementa o "Copiar erro para a IA" (que só surge em falha) — útil
+  para colar num chat ou guardar registro da execução.
 - **Aplicar em sandbox (cópia)** — paridade com o `--sandbox` do CLI.
 - **Criar atalho .bat…** — gera um atalho por projeto (reabre a GUI já apontada)
   e um atalho clássico "abrir GUI".

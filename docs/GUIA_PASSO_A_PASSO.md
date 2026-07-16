@@ -69,14 +69,24 @@ Fluxo:
 2. **Instrução:** aponte para o `.yaml` que a IA gerou — ou clique **Colar
    instrução** para colar o YAML direto do chat, sem salvar arquivo.
 3. **Pré-visualizar (dry-run):** mostra a árvore de arquivos com 🟢 (ok) / 🔴
-   (falha), cada modificação com ✓/✗, e o **diff colorido**. Nada é escrito
-   ainda. **Sempre revise aqui antes de aplicar.**
+   (falha) / ⚪ (inalterado), cada modificação com ✓/✗, e o **diff colorido**.
+   Nada é escrito ainda. **Sempre revise aqui antes de aplicar.**
+   - Um arquivo pode aparecer como 🟡 (**aplicado com ressalva**) — deu certo,
+     mas com um aviso a conferir (ex.: um `create_file` que vai **sobrescrever**
+     um arquivo já existente). Passe o mouse sobre o item para ler o aviso no
+     tooltip. A ressalva **não bloqueia** o Aplicar.
 4. **Aplicar:** cria o backup e escreve as mudanças. Se algo falhar no meio,
    tudo é revertido automaticamente (atômico).
 5. **Desfazer última aplicação:** reverte a última aplicação pelo backup.
 
 Se a prévia mostrar erro, clique **Copiar erro para a IA** e cole o bloco no
 chat — a IA corrige a instrução e você tenta de novo.
+
+Para guardar ou compartilhar o resultado inteiro, use **Copiar saída**: ela copia
+o relatório **completo** da última prévia/aplicação (todos os arquivos, status,
+avisos 🟡 e diffs), tanto quando deu certo quanto quando falhou. Diferente do
+"Copiar erro para a IA" (que só aparece em falha), o "Copiar saída" funciona nos
+dois casos — bom para colar num chat, anexar num relato ou manter registro.
 
 ### Atalho por projeto (.bat)
 
@@ -113,8 +123,9 @@ o `<TIMESTAMP>` de lá para um eventual `rollback`.
   projeto (`PASTA\<nome-do-projeto>\<timestamp>\`) para não misturar. Nesse caso,
   repita o mesmo `--backup-dir` no `rollback`.
 - **Histórico rápido:** dentro da pasta de backups há um `history.log` — uma
-  linha por aplicação (data, nº de arquivos, descrição), para ver o histórico
-  sem abrir cada pasta de timestamp.
+  linha por aplicação (data, nº de arquivos, descrição) **e também uma linha
+  quando você faz o Desfazer/rollback manual**, para acompanhar o histórico sem
+  abrir cada pasta de timestamp.
 - **Não gerar backup:** existe `--no-backup`, mas **não é recomendado** — sem
   backup, o desfazer automático não tem de onde restaurar. Prefira deixar o
   backup ligado e, se quiser, limpar as pastas antigas manualmente.
@@ -158,14 +169,23 @@ O guia já traz as regras que evitam os erros clássicos e um checklist de
 autovalidação. Se a aplicação falhar, o bloco de "Copiar erro para a IA" fecha o
 ciclo: a IA lê o erro, corrige a instrução, você reaplica.
 
+> Dica do validador: se a IA gerar um `replace_context_block` com uma âncora
+> **vazia** (por o trecho tocar o começo ou o fim do arquivo), o ASU já avisa e
+> sugere estratégias melhores para aquele caso (`replace_line_pattern`,
+> `insert_before_pattern`, `replace_section` ou `replace_function`).
+
 ---
 
 ## 8. Perguntas rápidas
 
+- **"O que é o 🟡 (ressalva)?"** É o meio-termo entre 🟢 (ok) e 🔴 (falha): a
+  mudança foi aplicada, mas com um aviso a conferir — hoje o caso típico é um
+  `create_file` que sobrescreve um arquivo que já existia. A ressalva não bloqueia
+  nem reverte nada; é só um alerta para você olhar o tooltip.
 - **"Posso repetir a mesma instrução?"** Sim — `create_file` sobre arquivo
-  existente vira sobrescrita com backup; e se a mudança já foi aplicada, a
-  âncora não casa e o ASU avisa (inclusive com a dica "provavelmente já foi
-  aplicada"). Nada é aplicado no lugar errado em silêncio.
+  existente vira sobrescrita com backup (e sinaliza 🟡); e se a mudança já foi
+  aplicada, a âncora não casa e o ASU avisa (inclusive com a dica "provavelmente
+  já foi aplicada"). Nada é aplicado no lugar errado em silêncio.
 - **"E se eu mudar a pasta raiz entre aplicar e desfazer?"** O desfazer usa a
   raiz **capturada no momento da aplicação**, não a do campo — então não quebra.
 - **"Dá para criar um arquivo novo com o ASU?"** Dá (`create_file`), mas para um
