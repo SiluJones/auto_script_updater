@@ -195,6 +195,7 @@ Mover a lógica de sandbox para o core (`patch_engine.make_sandbox` + `SANDBOX_I
 ---
 
 ## DEC-020 — ASU entra no toolchain via HUB compartilhado, em "modo só-HUB" (sem auto-aplicação do ASU sobre si)
+> **SUPERSEDIDA por DEC-029 (2026-07-15):** o HUB foi descontinuado; mantida aqui como registro histórico.
 **Data:** 2026-06-19 · **Status:** aceita · **Origem:** sessão de integração do toolchain KCM·ASU·FlatDrop
 
 ### Contexto
@@ -392,3 +393,11 @@ Criar um **canal de warnings não-fatais** que sobe pelo engine e chega à GUI, 
 - `patch_engine.py` e `base_strategy.py` ganham o mecanismo; `main_window.py` passa a exibir 🟡/⚠. ~11 testes novos (specs 0001+0002); suíte em ~144 funções `test_`, verdes; ruff/black limpos.
 - Base para futuras ressalvas (fuzzy de whitespace no caminho de sucesso, `occurrence` implícito, âncora Unicode-adjacente) sem novo encanamento — só emitir.
 - `__version__` 0.8.2 → **0.8.3**.
+
+---
+
+## DEC-029 — HUB descontinuado; coordenação entre frentes passa a ser direta (supersede DEC-020)
+**Contexto.** O toolchain **KCM · ASU · FlatDrop** era coordenado por um `HUB.md` único (gerado pela conversa do KCM), que registrava contratos entre as frentes e "caixas de entrada" por frente (ver DEC-020, "modo só-HUB").
+**Decisão.** Descontinuar o uso do HUB. A troca de informação entre frentes passa a ser **direta** — arquivo ou trecho colado — quando necessária. O **KCM segue sendo usado no ASU** (e projetos que usam o KCM são instruídos a usar o ASU); o **FlatDrop segue** organizando/movendo/subindo os arquivos. Sugestões para o KCM vão ao `IDEAS.md` e/ou são levadas pelo usuário.
+**Motivo.** O HUB não vinha de fato sendo usado para coordenar — ficava defasado (chegou a citar a ferramenta em v0.4.0 estando ela em 0.8.x). Um documento de coordenação meio-mantido gera mais confusão do que a sua ausência, e a coordenação de 3 frentes pequenas se resolve bem na mão. Não se automatiza (nem se monitora) o que não está sendo usado.
+**Consequências.** O assistente não lê mais o HUB no ritual, não monitora nem aponta "HUB defasado", e não instrui KCM/FlatDrop sobre o HUB. A história é preservada: DEC-020 (e a menção em DEC-021) permanecem como registro — esta DEC apenas as **supersede** na parte operacional. As referências operacionais ao HUB saem dos docs (ver C2–C5).

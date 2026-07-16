@@ -12,10 +12,9 @@
 1. Lê `CEREBRO.md` (este) — confirma comportamento e ritual.
 2. Lê `CONTEXT.md` — entende o projeto (panorama estável).
 3. Lê `STATUS.md` — descobre o estado atual e o próximo passo.
-4. Lê `HUB.md` — sua caixa de entrada e o status relâmpago das outras frentes do grupo (ver «Projeto em grupo» abaixo). Este projeto faz parte do toolchain KCM · ASU · FlatDrop.
-5. Lê última entrada do `CHANGELOG.md` — vê o que mudou desde a sessão anterior.
-6. **Não lê por padrão:** IDEAS inteiro, logs antigos, arquivos de arquivo morto. Lê sob demanda quando a tarefa exigir.
-7. Antes de executar: confirma em uma frase o que entendeu. Se houver ambiguidade real, pergunta antes.
+4. Lê última entrada do `CHANGELOG.md` — vê o que mudou desde a sessão anterior.
+5. **Não lê por padrão:** IDEAS inteiro, logs antigos, arquivos de arquivo morto. Lê sob demanda quando a tarefa exigir.
+6. Antes de executar: confirma em uma frase o que entendeu. Se houver ambiguidade real, pergunta antes.
 
 ## Princípios de trabalho
 
@@ -175,8 +174,6 @@ Pense na janela de contexto como a memória RAM: rápida, finita, zerada a cada 
 | Decisão de arquitetura ou troca de lib | Entrega o DECISIONS.md completo (nova DEC-N: contexto, decisão, alternativas, consequências). |
 | Mudança de fase do projeto | Entrega o ROADMAP.md completo com a fase atualizada (concluída / em curso / próxima). |
 | Termo técnico próprio do projeto usado | Entrega o GLOSSARY.md completo com o termo definido. |
-| Mudança sua que afeta outra frente do grupo (KCM/FlatDrop) | Abre um item na Caixa de entrada da frente dona, no `HUB.md`, assinado `[ASU AAAA-MM-DD]` — nunca edita os arquivos da outra frente (ver «Projeto em grupo»). |
-| Contrato do HUB mudou (você subiu uma versão: schema, manifesto, diretriz) | Atualiza a tabela do Cânone do `HUB.md` e abre item nas caixas dos consumidores, no mesmo passo (D3). |
 
 > Se um arquivo referenciado pelas regras acima (IDEAS, DECISIONS, etc.) ainda não existir no projeto, o assistente o CRIA na primeira necessidade — a partir do papel descrito e do modelo do kit — em vez de tratar a ausência como erro ou adiar a captura.
 
@@ -190,8 +187,7 @@ Cada arquivo abaixo vem INTEIRO e atualizado, pronto para você baixar e substit
 4. IDEAS.md — completo, com as ideias da sessão capturadas e reclassificadas
 5. ROADMAP.md — completo, se alguma fase mudou de estado (quando o projeto usa roadmap)
 6. GLOSSARY.md — completo, se surgiu termo novo (quando o projeto usa glossário)
-7. HUB.md — completo, se a sessão tocou o grupo (sua caixa processada + status relâmpago ≤3 linhas atualizado); há um só HUB (na raiz comum), então a versão nova substitui a anterior
-8. logs/AAAA-MM-DD.md — log da sessão preenchido (formato em LOG-TEMPLATE.md)
+7. logs/AAAA-MM-DD.md — log da sessão preenchido (formato em LOG-TEMPLATE.md)
 
 ## Quando perguntar vs. quando agir
 
@@ -244,19 +240,6 @@ Este projeto é desenvolvido com o **Claude Code** (CLI/desktop), além do chat 
 **Ao APLICAR uma spec (Code):** localize cada âncora EXATAMENTE; se não achar uma, **PARE e reporte** — nunca chute um lugar próximo. Não toque em nada fora das edições nomeadas. Rode `git diff` e confira a forma esperada antes de commitar.
 
 **Ambiente:** os comandos do Code rodam por um Git Bash interno (caminhos com `/` funcionam). Mensagens de commit **sem acento**. O arquivo-raiz `CLAUDE.md` (guia curto + comandos de build) e a pasta `.claude/` (permissões + comandos `/`) ficam na **raiz do repo** — veja-os ao iniciar. ATENÇÃO ao escopo das raias: o `meta/CEREBRO.md` (este) é o comportamento detalhado; o `CLAUDE.md` da raiz é só o ponteiro curto que o Code lê a cada sessão — não duplique regra entre os dois.
-
-## Projeto em grupo (HUB compartilhado)
-
-Este projeto faz parte de um GRUPO de ferramentas que se sincronizam — o toolchain **KCM** (Kit de Contexto Modular) · **ASU** (este) · **FlatDrop**. O grupo é coordenado por um **único** `HUB.md`, **gerado pela própria conversa do KCM** (não escrito à mão), que registra os **contratos** entre as frentes (formato da instrução, manifesto de achatamento, diretriz embutida pelo kit). Cada contrato tem **um dono**, e mudá-lo afeta os consumidores listados no Cânone (seção 0 do HUB). Regras:
-
-1. **No ritual de início**, leia o `HUB.md` logo após o `STATUS.md` — em especial a SUA caixa de entrada (frente ASU) e o status relâmpago das outras frentes, para saber num relance se pode confiar no contrato atual de cada uma.
-2. **Não mexa na casa do outro (D1/D2):** nunca altere nem entregue arquivos de outra frente (código do KCM, do FlatDrop, seus docs). Toda sugestão, crítica ou pedido a outra frente vira um item na **Caixa de entrada** dela (seção 2 do HUB), assinado `[ASU AAAA-MM-DD]` — não uma edição silenciosa.
-3. **Mudança sua que afete um contrato** (ex.: subir `format_version` da instrução, mudar o `INSTRUCTION_GUIDE`, alterar o texto da diretriz ASU) gera um item na caixa de cada consumidor E atualiza a tabela do Cânone, no mesmo passo (D3). Na dúvida de quem é dono de um dado/formato, **pergunte** — não duplique a verdade.
-4. **Ao encerrar uma sessão que toque o grupo:** processe sua caixa (triagem → veredito + motivo), atualize seu status relâmpago (≤3 linhas) e entregue o `HUB.md` COMPLETO. Como há **um só** HUB, entregar a versão nova substitui a anterior — não há cópias para sincronizar repo a repo.
-
-> **Onde o HUB mora:** existe **um único** `HUB.md`, na **pasta-raiz comum** que contém os três projetos (não duplicado dentro de cada repo). É de lá que cada frente o lê; quando precisa entrar no Projeto do Claude, sobe avulso. Opcionalmente pode ser versionado junto com o KCM, só por segurança de histórico. **Concorrência:** se duas frentes gerarem um `HUB.md` novo na mesma janela, junte os dois e peça a UMA frente que faça o *merge* canônico (a fonte da verdade resultante) — em vez de deixar duas versões competindo.
-
-> **Particularidade deste HUB:** ele é **só-gatilho** — descreve contratos e gatilhos, sem ferramenta que o aplique. Enquanto o toolchain é pequeno (três frentes), coordenação leve basta; se a coordenação começar a doer, aí sim avaliar automatizar (cadência «gatilho agora, ferramenta depois, se a dor aparecer»). Os contratos e o status de cada frente vivem no próprio `HUB.md` (fonte de verdade do grupo); este CEREBRO.md só diz COMO se comportar diante dele.
 
 > **Saída de código deste projeto:** o ASU é desenvolvido normalmente (arquivos Python inteiros / zips versionados pela ferramenta de código), **não** como instrução do próprio ASU. A diretriz «Saída via ASU (patch)» que o kit pode injetar (switch *asuMode*) é para projetos CONSUMIDORES do ASU — não para o repo do ASU em si. Decisão do usuário: **por ora não se usa o ASU para atualizar o próprio sistema** (o dogfooding do toolchain acontece com o ASU editando OUTRA frente — ex.: o KCM —, não a si mesmo). Mantido deliberadamente desligado aqui.
 

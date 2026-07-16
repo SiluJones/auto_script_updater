@@ -3,5 +3,4 @@ Encerre a tarefa:
 - Atualize `meta/STATUS.md` (append, não reescreva).
 - Acrescente `DEC-`/`FIX-` em `meta/DECISIONS.md` se houve decisão de arquitetura ou bug grave.
 - Marque estado de fase em `meta/ROADMAP.md` se uma fase mudou.
-- Se a sessão tocou o grupo, atualize seu status relâmpago no `meta/HUB.md`.
 Depois, me mostre o `git diff` e o comando de commit (uma linha por comando, mensagem SEM acento).

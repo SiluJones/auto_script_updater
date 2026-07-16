@@ -70,7 +70,7 @@ auto_script_updater/
 
 # NÃO versionados no Projeto (vivem no Git): logs/AAAA-MM-DD.md (logs de sessão).
 # Docs de contexto (meta/): CEREBRO (ex-CLAUDE), CONTEXT, STATUS, DECISIONS, DECISIONS-archive (fundacionais F0–F1), CHANGELOG, IDEAS, ROADMAP, GLOSSARY, HISTORY (ex-HISTORICO), LOG-TEMPLATE.
-# Raiz do repo (modo Claude Code): CLAUDE.md (ponteiro curto p/ o Code) + .claude/ (settings.json + commands/). HUB.md do toolchain vive na pasta-raiz comum aos 3 projetos (não dentro deste repo).
+# Raiz do repo (modo Claude Code): CLAUDE.md (ponteiro curto p/ o Code) + .claude/ (settings.json + commands/).
 ```
 
 ## Ambiente e fluxo de trabalho com o Claude (CRÍTICO para a continuidade)

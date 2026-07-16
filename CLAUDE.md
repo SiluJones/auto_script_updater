@@ -4,7 +4,7 @@
 > O comportamento detalhado do assistente está em `meta/CEREBRO.md`. Não duplique regra aqui.
 
 ## Ritual de início
-Leia `meta/CEREBRO.md` → `meta/CONTEXT.md` → `meta/STATUS.md` → `meta/HUB.md` antes de agir. Confirme em uma frase o que entendeu. Se houver ambiguidade real, pergunte antes.
+Leia `meta/CEREBRO.md` → `meta/CONTEXT.md` → `meta/STATUS.md` antes de agir. Confirme em uma frase o que entendeu. Se houver ambiguidade real, pergunte antes.
 
 ## Build / validação
 - Testes: `python -m pytest` — devem ficar todos verdes antes de commitar mudança de código.
