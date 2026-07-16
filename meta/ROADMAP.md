@@ -78,7 +78,7 @@
 - [ ] Checksum SHA-256 dos arquivos antes/depois registrado no log.
 - [ ] Modo comparação acumulada pós-aplicação (diff de todos os arquivos numa tela).
 - [→] Gerador de `.bat` por projeto — **movido para a F2** (increment "Acesso rápido", spec `meta/specs/F2-acesso-rapido.md`), por estar acoplado aos args de lançamento e às pastas recentes que o usuário pediu junto.
-- [ ] Botão/flag para copiar a SAÍDA completa (não só erro), inclusive em sucesso — ver IDEAS.
+- [x] Botão/flag para copiar a SAÍDA completa (não só erro), inclusive em sucesso — ver IDEAS. (spec0004, 0.8.5)
 - [x] Backup configurável: `--backup-dir` + `history.log` (DEC-018); exposto na GUI + aninhado por projeto quando externo + `rollback_from_dir` (DEC-024 a/b, 0.8.0); **padrão `parent(root)/backups/<ts>` (DEC-024c, 0.8.1)**. PENDENTE: limpeza automática de backups antigos (manter últimos N/X dias).
 - [ ] Packaging PyInstaller como `.exe` standalone Windows (UPX para compressão).
 - [ ] README de usuário final com capturas de tela e guia de início rápido.

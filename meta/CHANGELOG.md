@@ -7,6 +7,12 @@
 
 ---
 
+## [0.8.5] — 2026-07-15
+### Adicionado
+- **Botão "Copiar saída" na GUI (spec0004):** copia o relatório COMPLETO da última prévia/aplicação — todos os arquivos, status, avisos (🟡) e diffs, tanto no sucesso quanto na falha — para a área de transferência. Serialização por função pura `_report_to_text` (sem Qt, testável); gancho em `_populate_tree`, cobrindo preview e apply. Complementa o "Copiar erro para a IA" (que só aparece em falha). Commit `31b8350`. Sem DEC nova.
+
+---
+
 ## [0.8.4] — 2026-07-06
 ### Corrigido / Ajustado
 - **Validador com dica acionável (spec0003):** `instruction_validator._format_error` ganhou `_schema_error_hint` — quando o erro de schema é `minLength` em `location.before`/`after` (âncora vazia do `replace_context_block`), a mensagem passa a incluir uma segunda linha "Dica:" explicando que o bloco provavelmente toca a borda do arquivo e sugerindo `replace_line_pattern`/`insert_before_pattern`/`replace_section`/`replace_function` como alternativa. Chaveia por `error.validator` (estável), não pelo texto da mensagem. Origem: print do usuário 07-03.
