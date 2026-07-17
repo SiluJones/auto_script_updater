@@ -1,3 +1,5 @@
 # Camada de GUI (F2). Instale junto com o núcleo: pip install -r requirements-gui.txt
 -r requirements.txt
 PySide6>=6.6
+# Realce de sintaxe no diff da GUI (opcional — a GUI degrada sem ele).
+Pygments>=2.17

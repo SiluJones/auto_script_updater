@@ -20,7 +20,12 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")  # roda sem servidor gráf
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from src.core.patch_engine import ApplyReport, FileResult, ModificationResult  # noqa: E402
-from src.gui.main_window import MainWindow, _diff_to_html, _report_to_text  # noqa: E402
+from src.gui.main_window import (  # noqa: E402
+    _CSS_ADD,
+    MainWindow,
+    _diff_to_html,
+    _report_to_text,
+)
 
 _REPO = Path(__file__).resolve().parent.parent
 
@@ -113,6 +118,29 @@ def test_diff_to_html_colors_lines():
     htm = _diff_to_html("--- a/x\n+++ b/x\n@@ -1 +1 @@\n-velho\n+novo\n ctx")
     assert htm.count("<span") == 5  # 3 cabeçalhos + 1 del + 1 add
     assert "novo" in htm and "velho" in htm
+
+
+def test_diff_to_html_sem_path_e_o_comportamento_antigo():
+    """Regressão explícita: sem `path`, a saída é idêntica ao modo só-de-linha."""
+    diff = "--- a/x\n+++ b/x\n@@ -1 +1 @@\n-velho\n+novo\n ctx"
+    assert _diff_to_html(diff) == _diff_to_html(diff, None)
+
+
+def test_diff_to_html_extensao_desconhecida_cai_no_fallback():
+    """Extensão que o Pygments não mapeia → realce só-de-linha (foreground)."""
+    diff = "--- a/x.zzz\n+++ b/x.zzz\n@@ -1 +1 @@\n-velho\n+novo\n ctx"
+    htm = _diff_to_html(diff, "x.zzz")
+    assert _CSS_ADD in htm  # marca a adição pelo foreground (fallback)
+
+
+def test_diff_to_html_realca_python_quando_ha_pygments():
+    """Com `path` .py e Pygments instalado: adição marca pelo FUNDO e há mais
+    spans (realce de token). Pulado se o Pygments não estiver instalado."""
+    pytest.importorskip("pygments")
+    diff = "--- a/x.py\n+++ b/x.py\n@@ -0,0 +1 @@\n+def foo():\n"
+    htm = _diff_to_html(diff, "src/x.py")
+    assert "background-color" in htm  # adição marca pelo fundo
+    assert htm.count("<span") > 4  # tokens realçados acrescentam spans
 
 
 def test_gui_stale_preview_blocks_apply(app, demo_root, tmp_path, monkeypatch):

@@ -11,7 +11,9 @@ Decisões conscientes desta primeira versão:
 - Execução síncrona (operações locais e rápidas); thread/worker fica para
   quando houver caso real de lentidão.
 - O diff é renderizado pelo ``diff_renderer`` sem ANSI e colorido aqui via
-  HTML (uma linha por ``<span>``), evitando dependência de highlighter.
+  HTML (uma linha por ``<span>``). O realce de SINTAXE é opcional: com Pygments
+  instalado (dependência de GUI), cada linha ganha cores por token e adição/
+  remoção passam a marcar pelo fundo; sem Pygments, cai no realce só-de-linha.
 """
 
 from __future__ import annotations
@@ -52,6 +54,10 @@ from ..core.patch_engine import ApplyReport, SandboxError, apply_instruction, ma
 _CSS_ADD = "color:#0a7a2f;"
 _CSS_DEL = "color:#b00020;"
 _CSS_HDR = "color:#005a9e;font-weight:bold;"
+# Fundos suaves usados SÓ no modo com syntax-highlight: como o realce vem do
+# foreground (cores por token), adição/remoção passam a marcar pelo FUNDO.
+_CSS_ADD_BG = "background-color:#e6ffed;"
+_CSS_DEL_BG = "background-color:#ffeef0;"
 
 _STATUS_LABEL = {
     "created": "criado",
@@ -64,14 +70,64 @@ _STATUS_LABEL = {
 _MAX_RECENTS = 8
 
 
-def _diff_to_html(diff: str) -> str:
-    """Converte um unified diff (sem ANSI) em HTML colorido linha a linha."""
+def _lexer_for(path: str | None):
+    """Devolve um lexer Pygments para o arquivo, ou ``None``.
+
+    ``None`` significa "sem realce" (Pygments ausente ou extensão que o Pygments
+    não mapeia) — o chamador cai no realce só-de-linha. O lexer é escolhido pelo
+    NOME do arquivo, então é estável e resolvido UMA vez por diff.
+    """
+    if not path:
+        return None
+    try:
+        from pygments.lexers import guess_lexer_for_filename
+        from pygments.util import ClassNotFound
+    except ImportError:  # pragma: no cover - sem Pygments
+        return None
+    try:
+        return guess_lexer_for_filename(path, "")
+    except ClassNotFound:
+        return None
+
+
+def _highlight_line(code: str, lexer) -> str:
+    """Realça UMA linha de código como HTML inline. ``lexer`` já resolvido."""
+    from pygments import highlight
+    from pygments.formatters import HtmlFormatter
+
+    # nowrap=True: sem <div>/<pre> ao redor; noclasses=True: estilos inline (o
+    # QTextEdit não carrega CSS externo). rstrip: Pygments encerra com "\n".
+    return highlight(code, lexer, HtmlFormatter(nowrap=True, noclasses=True)).rstrip("\n")
+
+
+def _diff_to_html(diff: str, path: str | None = None) -> str:
+    """Converte um unified diff (sem ANSI) em HTML colorido linha a linha.
+
+    Com ``path`` E Pygments instalado, cada linha de código ganha **realce de
+    sintaxe** (foreground) e adição/remoção marcam pelo FUNDO. Sem ``path`` ou
+    sem Pygments, mantém-se o realce só-de-linha (foreground) — comportamento e
+    testes originais preservados.
+    """
+    lexer = _lexer_for(path)
     linhas = []
     for ln in diff.split("\n"):
         esc = html.escape(ln) or "&nbsp;"
         if ln.startswith(("+++", "---", "@@")):
             linhas.append(f'<span style="{_CSS_HDR}">{esc}</span>')
-        elif ln.startswith("+"):
+            continue
+        # Modo com realce: separa o marcador (+/-/espaço) do código e realça o
+        # código; o marcador é reanexado e a linha inteira recebe o FUNDO.
+        if lexer is not None and ln[:1] in ("+", "-", " "):
+            corpo_ln = html.escape(ln[:1]) + _highlight_line(ln[1:], lexer)
+            if ln[0] == "+":
+                linhas.append(f'<span style="{_CSS_ADD_BG}">{corpo_ln}</span>')
+            elif ln[0] == "-":
+                linhas.append(f'<span style="{_CSS_DEL_BG}">{corpo_ln}</span>')
+            else:
+                linhas.append(corpo_ln)
+            continue
+        # Fallback (sem realce): coloração de linha original.
+        if ln.startswith("+"):
             linhas.append(f'<span style="{_CSS_ADD}">{esc}</span>')
         elif ln.startswith("-"):
             linhas.append(f'<span style="{_CSS_DEL}">{esc}</span>')
@@ -768,7 +824,7 @@ class MainWindow(QMainWindow):
             estilo = f"{_CSS_DEL}font-family:Consolas,monospace"
             self.diff_view.setHtml(f'<pre style="{estilo}">{html.escape(fr.error)}</pre>')
         else:
-            self.diff_view.setHtml(_diff_to_html(fr.diff or "(sem alterações)"))
+            self.diff_view.setHtml(_diff_to_html(fr.diff or "(sem alterações)", fr.path))
 
     @staticmethod
     def _resumo(report: ApplyReport) -> str:
