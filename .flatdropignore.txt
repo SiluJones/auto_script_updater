@@ -1,0 +1,48 @@
+# .flatdropignore — ASU (auto_script_updater)
+# Sintaxe .gitignore. Salvo na RAIZ do repo, versionado; tem a palavra final
+# sobre o que o FlatDrop SOBE ao mount do Projeto do Claude.
+# Tudo listado aqui CONTINUA no git — so NAO e enviado ao Projeto
+# (FlatDrop != deploy != git). Sao padroes POSITIVOS: excluem a mais o que a
+# allowlist do FlatDrop ja deixaria passar.
+#
+# CUIDADO (raia Chat): o chat so enxerga o MOUNT. O que sair daqui o chat NAO
+# le "sob demanda" — quem le e o Code (que tem o git). Se precisar estudar um
+# arquivo excluido DENTRO do Projeto, reinclua-o pontualmente com "!".
+#
+# Economia estimada nesta config: logs ~22k + specs ~25k + archive ~7,5k tokens
+# => o mount cai de ~186k para ~132k tokens, sem perder nada do git.
+
+# --- Logs diarios de sessao (~22k tokens) ---
+# Regra JA existente do projeto: "logs de sessao NAO ficam no Projeto; vivem em
+# logs/ no git e sao lidos sob demanda". O "agora" esta em meta/STATUS.md; o
+# consolidado em meta/CHANGELOG.md. Isto so passa a CUMPRIR essa regra.
+logs/
+
+# --- Specs ja aplicadas (~25k tokens; maior bloco redundante) ---
+# O desfecho de cada spec ja vive em meta/DECISIONS.md (DEC-0xx),
+# meta/CHANGELOG.md e meta/STATUS.md. O corpo bruto e historico e pesa muito.
+# Nota: usamos "meta/specs/*" (e NAO "meta/specs/") de proposito — o "!" abaixo
+# so consegue REINCLUIR um arquivo se a pasta nao foi excluida por inteiro.
+meta/specs/*
+
+# Specs EM ANDAMENTO (ainda nao aplicadas) devem continuar visiveis ao Code e ao
+# proximo chat. Reinclua a spec em voo do ciclo atual, ex.:
+#!meta/specs/260716-spec0006-syntax-highlight-diff.md
+
+# SALVAGUARDA (licao registrada no HANDOFF): ANTES de autorar uma spec, confira
+# se ela ja existe. Com as specs fora do mount, essa conferencia passa a apoiar
+# em STATUS + CHANGELOG + DECISIONS (que citam cada spec por numero). Mantenha
+# essa disciplina — foi assim que spec0003/0004 foram reautoradas a toa.
+
+# --- Arquivo historico de decisoes (~7,5k tokens) ---
+# Decisoes fundacionais F0-F1 arquivadas; consultadas raramente. O DECISIONS.md
+# VIVO continua no mount. Reinclua "!meta/DECISIONS-archive.md" para estudar uma
+# decisao antiga dentro do Projeto.
+meta/DECISIONS-archive.md
+
+# --- NAO se aplica ao ASU (deixado como referencia do modelo de origem) ---
+# O projeto "contexto-modular" tambem excluia um build gerado (index.html) e uma
+# pasta meta/analises/*. O ASU nao tem build web nem pasta meta/analises/ —
+# nada a excluir aqui. (Se um dia existir, descomente.)
+#index.html
+#meta/analises/*
