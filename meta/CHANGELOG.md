@@ -7,6 +7,14 @@
 
 ---
 
+## [0.8.6] — 2026-07-16
+### Adicionado
+- **Syntax-highlight opcional no diff da GUI (spec0006, DEC-030):** com Pygments instalado (dependência de GUI), o diff da prévia/resultado ganha realce de sintaxe por token; o lexer é escolhido pelo nome do arquivo. Nesse modo, adição/remoção passam a marcar pelo FUNDO (verde/vermelho claros) e o foreground carrega as cores de sintaxe. Sem Pygments, sem caminho, ou extensão desconhecida → cai no realce só-de-linha antigo (degradação graciosa, como o colorama no core). Núcleo/CLI intactos. `_diff_to_html` ganhou parâmetro `path` opcional (default `None` = comportamento antigo).
+### Testes / Qualidade
+- 3 testes novos em `test_gui_smoke.py` (regressão sem `path`, fallback de extensão desconhecida, realce de Python sob `importorskip`); `ruff`/`black`/`self-test` limpos. `__version__` 0.8.5 → **0.8.6**.
+
+---
+
 ## [0.8.5] — 2026-07-15
 ### Adicionado
 - **Botão "Copiar saída" na GUI (spec0004):** copia o relatório COMPLETO da última prévia/aplicação — todos os arquivos, status, avisos (🟡) e diffs, tanto no sucesso quanto na falha — para a área de transferência. Serialização por função pura `_report_to_text` (sem Qt, testável); gancho em `_populate_tree`, cobrindo preview e apply. Complementa o "Copiar erro para a IA" (que só aparece em falha). Commit `31b8350`. Sem DEC nova.

@@ -54,7 +54,7 @@
 **Itens estruturais restantes da F2 (próximo increment):**
 - [x] `src/gui/main_window.py` — janela principal, barra de menu, barra de status.
 - [x] Árvore de arquivos afetados com ícone de status por arquivo (🟢/🟡/🔴/⚪) e por modificação (✓/⚠/✗) — integrada na main_window; **o 🟡 "aplicado com ressalva" chegou (0.8.3, specs 0001+0002): canal de warnings não-fatais no engine + indicador na GUI.**
-- [~] Diff colorido por arquivo integrado na main_window (HTML, verde/vermelho); syntax highlight por linguagem ainda pendente.
+- [x] Diff colorido por arquivo na main_window (HTML). Syntax-highlight por linguagem via Pygments opcional, com degradação graciosa (0.8.6, DEC-030).
 - [~] Seletor de raiz lembra o ÚLTIMO uso (QSettings); recentes+fixadas chegam no increment ativo acima.
 - [ ] Barra de progresso durante aplicação de instruções com muitos arquivos.
 - [x] Modo dry-run na GUI — o botão "Pré-visualizar" É um dry-run (sempre antes de aplicar; desenho mais seguro que checkbox).
