@@ -62,6 +62,9 @@ A ferramenta deve ter um formato de instrução bem definido que a IA aprende a 
 
 ## 🤖 Ideias Ativas — Assistente
 
+### 2026-07-18 — Demo idempotente para conferência manual da ressalva — EM ABERTO (baixa prioridade)
+Ao aplicar a spec0008 (ressalva 🟡 no CLI), a conferência manual sugerida — rodar a demo DUAS vezes na mesma raiz para o `create_file` sobrescrever `health.py` e exibir o `~`/`N com ressalva` — NÃO chega a demonstrar o aviso: o segundo run falha antes no `delete_json_path` do `config.json` (`legacy.deprecated_flag` já foi removido no run 1), e a falha dispara rollback antes de o `create_file` rodar. O comportamento do CLI já está provado pelo teste unitário `test_cli_print_report_mostra_ressalva`; isto é só um atrito da própria demo. Ideia: tornar a demo re-executável de forma limpa — ex.: o `delete_json_path` tolerar caminho ausente na demo (ou a demo não incluir a modificação não-idempotente), de modo que o 2º run chegue ao `create_file` e exiba a ressalva ao vivo. Cuidado ao mexer: `examples/demo.yaml` também alimenta o `self-test` (5 estratégias) e o `test_patch_engine` — mudar a demo pode exigir ajustar asserts. Baixíssima prioridade (não afeta produto nem cobertura).
+
 ### 2026-07-17 — Exibir a ressalva 🟡 também no resumo do CLI — CONCLUÍDA (spec0008, 0.8.7)
 O canal de warnings (DEC-028, 0.8.3) faz o 🟡 aparecer na GUI (árvore + tooltip), mas o `_print_report` do CLI (`src/__main__.py`) só imprime criado/modificado/inalterado/falha — a RESSALVA fica **invisível na linha de comando**. Achado ao autorar a spec0006. Baixo risco: no resumo do `_print_report`, contar as ressalvas e, por arquivo com `has_warnings`, imprimir os avisos (a mesma informação que o `_report_to_text` já serializa). Fecha a paridade CLI↔GUI do 🟡. Candidato natural de próxima passada pequena.
 
