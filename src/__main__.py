@@ -51,6 +51,11 @@ def _print_report(report: ApplyReport) -> None:
         print(f"\n=== [{rotulo}] {fr.path} ===")
         if fr.error:
             print(f"  ! {fr.error}")
+        # Ressalva (DEC-028): avisos não-fatais — a aplicação deu certo, mas há
+        # algo a conferir. Marcador `~` igual ao de `_report_to_text` (GUI).
+        for mr in fr.modifications:
+            for aviso in mr.warnings:
+                print(f"  ~ {aviso}")
         if fr.diff:
             print(fr.diff)
         elif fr.status == "unchanged":
@@ -60,13 +65,19 @@ def _print_report(report: ApplyReport) -> None:
     modificados = sum(1 for f in report.files if f.status == "modified")
     inalterados = sum(1 for f in report.files if f.status == "unchanged")
     falhas = sum(1 for f in report.files if f.status == "failed")
+    com_ressalva = sum(1 for f in report.files if f.has_warnings)
 
     print("\n" + "-" * 60)
     modo = "SIMULAÇÃO (dry-run)" if report.dry_run else "APLICAÇÃO"
+    # Sufixo da ressalva só aparece quando há alguma — sem avisos, a linha de
+    # resumo fica IDÊNTICA à de antes (nada muda no caso comum).
+    ressalva = f", {com_ressalva} com ressalva" if com_ressalva else ""
     print(
         f"{modo}: {criados} criado(s), {modificados} modificado(s), "
-        f"{inalterados} inalterado(s), {falhas} falha(s)."
+        f"{inalterados} inalterado(s), {falhas} falha(s){ressalva}."
     )
+    if com_ressalva:
+        print("Atenção: há aviso(s) não-fatal(is) marcados com `~` acima — confira.")
     if report.rolled_back:
         print("ATENÇÃO: ocorreu falha — todas as escritas foram revertidas (rollback).")
     if report.backup_dir and not report.dry_run:

@@ -393,6 +393,34 @@ def test_cli_sandbox_applies_on_copy_not_original(tmp_path, monkeypatch):
     assert not (sb / "node_modules").exists()
 
 
+def test_cli_print_report_mostra_ressalva(capsys):
+    """DEC-028/paridade: aviso não-fatal aparece por arquivo (`~`) e no resumo."""
+    from src.__main__ import _print_report
+    from src.core.patch_engine import ApplyReport, FileResult, ModificationResult
+
+    mr = ModificationResult(mod_id="m1", strategy="create_file", ok=True)
+    mr.warnings.append("arquivo já existia — sobrescrito")
+    fr = FileResult(file_id="f1", path="x.py", status="created", modifications=[mr])
+    _print_report(ApplyReport(ok=True, dry_run=False, files=[fr]))
+
+    out = capsys.readouterr().out
+    assert "~ arquivo já existia — sobrescrito" in out  # aviso por arquivo
+    assert "1 com ressalva" in out  # contagem no resumo
+
+
+def test_cli_print_report_sem_ressalva_nao_polui(capsys):
+    """Sem avisos, a linha de resumo NÃO ganha o sufixo de ressalva."""
+    from src.__main__ import _print_report
+    from src.core.patch_engine import ApplyReport, FileResult
+
+    fr = FileResult(file_id="f1", path="x.py", status="modified")
+    _print_report(ApplyReport(ok=True, dry_run=False, files=[fr]))
+
+    out = capsys.readouterr().out
+    assert "com ressalva" not in out
+    assert "1 modificado(s)" in out
+
+
 def test_cli_sandbox_rejects_absolute_paths(tmp_path, capsys):
     from src.__main__ import main
 
