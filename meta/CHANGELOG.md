@@ -7,6 +7,14 @@
 
 ---
 
+## [0.8.7] — 2026-07-17
+### Adicionado
+- **Ressalva (🟡) visível no CLI (spec0008):** `_print_report` passa a imprimir cada aviso não-fatal por arquivo (marcador `~`, o mesmo de `_report_to_text`) e a contá-los no resumo (`N com ressalva`), com uma linha de atenção quando houver. Fecha a paridade CLI↔GUI do canal de warnings (DEC-028): antes, um `create_file` que sobrescrevia arquivo existente passava como sucesso silencioso na linha de comando. Sem avisos, a saída é idêntica à anterior.
+### Testes / Qualidade
+- 2 testes novos em `test_patch_engine.py` (com ressalva; sem ressalva não polui o resumo); `ruff`/`black`/`self-test` limpos. `__version__` 0.8.6 → **0.8.7**.
+
+---
+
 ## [0.8.6] — 2026-07-16
 ### Adicionado
 - **Syntax-highlight opcional no diff da GUI (spec0006, DEC-030):** com Pygments instalado (dependência de GUI), o diff da prévia/resultado ganha realce de sintaxe por token; o lexer é escolhido pelo nome do arquivo. Nesse modo, adição/remoção passam a marcar pelo FUNDO (verde/vermelho claros) e o foreground carrega as cores de sintaxe. Sem Pygments, sem caminho, ou extensão desconhecida → cai no realce só-de-linha antigo (degradação graciosa, como o colorama no core). Núcleo/CLI intactos. `_diff_to_html` ganhou parâmetro `path` opcional (default `None` = comportamento antigo).

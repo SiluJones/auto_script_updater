@@ -62,7 +62,7 @@ A ferramenta deve ter um formato de instrução bem definido que a IA aprende a 
 
 ## 🤖 Ideias Ativas — Assistente
 
-### 2026-07-17 — Exibir a ressalva 🟡 também no resumo do CLI — EM ABERTO (achado nesta sessão)
+### 2026-07-17 — Exibir a ressalva 🟡 também no resumo do CLI — CONCLUÍDA (spec0008, 0.8.7)
 O canal de warnings (DEC-028, 0.8.3) faz o 🟡 aparecer na GUI (árvore + tooltip), mas o `_print_report` do CLI (`src/__main__.py`) só imprime criado/modificado/inalterado/falha — a RESSALVA fica **invisível na linha de comando**. Achado ao autorar a spec0006. Baixo risco: no resumo do `_print_report`, contar as ressalvas e, por arquivo com `has_warnings`, imprimir os avisos (a mesma informação que o `_report_to_text` já serializa). Fecha a paridade CLI↔GUI do 🟡. Candidato natural de próxima passada pequena.
 
 ### 2026-07-17 — Diff intra-linha (nível de palavra) na GUI — PROPOSTA (mecânica on-theme para prosa)
