@@ -62,6 +62,8 @@
 - [x] Checkbox "Aplicar em sandbox (cópia)" — paridade com `--sandbox` do CLI (DEC-019).
 - [x] Proteção de estado entre prévia/aplicação/desfazer (fingerprint SHA-256 + raiz capturada — FIX-007).
 - [~] Botão "Desfazer última aplicação" entregue (rollback do timestamp da sessão); seleção de timestamps antigos pendente.
+- [x] Syntax-highlight opcional no diff da GUI via Pygments, com degradação graciosa (0.8.6, DEC-030).
+- [x] Atalho "abrir GUI" semeia a navegação na própria pasta e começa limpo (`--start-dir`, 0.9.1/0.9.2, specs 0011/0012).
 - [ ] Indicador de confiança por modificação (🟢 único / 🟡 ambíguo / 🔴 não encontrado).
 - [ ] Suporte a tema claro/escuro seguindo a preferência do sistema (Qt color scheme).
 - [x] Botão "Colar instrução" — lê YAML da área de transferência (sem salvar arquivo).
@@ -79,7 +81,7 @@
 - [ ] Modo comparação acumulada pós-aplicação (diff de todos os arquivos numa tela).
 - [→] Gerador de `.bat` por projeto — **movido para a F2** (increment "Acesso rápido", spec `meta/specs/F2-acesso-rapido.md`), por estar acoplado aos args de lançamento e às pastas recentes que o usuário pediu junto.
 - [x] Botão/flag para copiar a SAÍDA completa (não só erro), inclusive em sucesso — ver IDEAS. (spec0004, 0.8.5)
-- [x] Backup configurável: `--backup-dir` + `history.log` (DEC-018); exposto na GUI + aninhado por projeto quando externo + `rollback_from_dir` (DEC-024 a/b, 0.8.0); **padrão `parent(root)/backups/<ts>` (DEC-024c, 0.8.1)**. PENDENTE: limpeza automática de backups antigos (manter últimos N/X dias).
+- [x] Backup configurável: `--backup-dir` + `history.log` (DEC-018); exposto na GUI + aninhado por projeto quando externo + `rollback_from_dir` (DEC-024 a/b, 0.8.0). **Padrão `parent(root)/zz_backups/<ts>`, DERIVADO da raiz** (DEC-024c → DEC-032, 0.9.0): o campo da GUI não é mais persistido, mostra o destino no placeholder e acompanha a troca de raiz; rollback tem fallback de leitura para o layout antigo `backups/`. PENDENTE: limpeza automática de backups antigos (manter últimos N/X dias) — parqueado (maior risco, interage com rollback).
 - [ ] Packaging PyInstaller como `.exe` standalone Windows (UPX para compressão).
 - [ ] README de usuário final com capturas de tela e guia de início rápido.
 
