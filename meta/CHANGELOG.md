@@ -7,6 +7,16 @@
 
 ---
 
+## [0.9.0] — 2026-07-20
+### Corrigido
+- **Endereçamento do backup voltou a seguir a RAIZ (spec0010, DEC-032).** Duas causas somadas: (1) a GUI persistia `last_backup_dir` no `QSettings` e nunca re-derivava o destino, então um caminho escolhido uma vez "grudava" e ignorava a troca de raiz; (2) a suíte de testes gravava no `QSettings` REAL (no Windows, o registro do usuário) — `test_save_and_restore_backup_dir` chegou a injetar um caminho `pytest-of-*/.../meu_backup` na GUI de um usuário real. O engine estava correto o tempo todo. Agora: campo vazio = destino derivado da raiz; o placeholder exibe o caminho calculado e acompanha a troca de raiz; o campo não é mais persistido; os testes rodam com `QSettings` isolado em `.ini` temporário.
+### Alterado
+- **Pasta padrão de backup renomeada de `backups/` para `zz_backups/`** (constante `BACKUP_DIRNAME`): o prefixo mantém a pasta no fim da listagem da pasta-pai, longe do projeto. **Rollback de backups antigos continua funcionando** (fallback para `backups/` na leitura). `SANDBOX_IGNORES` e `.gitignore` cobrem os dois nomes.
+### Testes / Qualidade
+- Testes novos: layout `zz_backups`, fallback de rollback legado, placeholder que segue a raiz, e regressão de "backup-dir não é persistido". Fixture `autouse` isolando o `QSettings` da GUI. `ruff`/`black`/`self-test` limpos. `__version__` 0.8.7 → **0.9.0**.
+
+---
+
 ## [0.8.7] — 2026-07-17
 ### Adicionado
 - **Ressalva (🟡) visível no CLI (spec0008):** `_print_report` passa a imprimir cada aviso não-fatal por arquivo (marcador `~`, o mesmo de `_report_to_text`) e a contá-los no resumo (`N com ressalva`), com uma linha de atenção quando houver. Fecha a paridade CLI↔GUI do canal de warnings (DEC-028): antes, um `create_file` que sobrescrevia arquivo existente passava como sucesso silencioso na linha de comando. Sem avisos, a saída é idêntica à anterior.
