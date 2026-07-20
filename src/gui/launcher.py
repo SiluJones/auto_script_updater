@@ -67,6 +67,11 @@ def build_open_gui_bat(*, asu_home: Path) -> str:
 
     Usa pythonw.exe (sem janela de console) e start /d para definir o diretorio
     de trabalho de forma robusta, sem depender de projeto especifico.
+
+    Passa ``--start-dir "%~dp0."`` (spec0011): os dialogos de "Escolher..." abrem
+    na pasta ONDE O .BAT ESTA, que e para onde o usuario copia o atalho. Isso NAO
+    define a raiz -- o atalho continua generico. O sufixo "." e obrigatorio:
+    ``%~dp0`` termina em barra invertida e ``"%~dp0"`` escaparia a aspa (DEC-023).
     """
     asu_home = asu_home.resolve()
     precisa_utf8 = not str(asu_home).isascii()
@@ -75,5 +80,6 @@ def build_open_gui_bat(*, asu_home: Path) -> str:
         "@echo off\n"
         + chcp_line
         + "REM Atalho gerado pelo ASU -- abre a interface (sem console).\n"
-        + f'start "" /d "{asu_home}" "{asu_home}\\.venv\\Scripts\\pythonw.exe" -m src.gui\n'
+        + f'start "" /d "{asu_home}" "{asu_home}\\.venv\\Scripts\\pythonw.exe" '
+        + '-m src.gui --start-dir "%~dp0."\n'
     )

@@ -22,11 +22,18 @@ if __name__ == "__main__":  # pragma: no cover
         metavar="ARQUIVO",
         help="Arquivo de instrucao (.yaml/.json)",
     )
+    parser.add_argument(
+        "--start-dir",
+        metavar="PASTA",
+        dest="start_dir",
+        help="Pasta onde os dialogos de escolha comecam (NAO define a raiz)",
+    )
     args = parser.parse_args()
     raise SystemExit(
         run(
             root=args.root,
             instruction_dir=args.instruction_dir,
             instruction=args.instruction,
+            start_dir=args.start_dir,
         )
     )

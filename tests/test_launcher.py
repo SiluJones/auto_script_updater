@@ -212,3 +212,15 @@ def test_build_open_gui_bat_accented_has_chcp(tmp_path):
 
     texto = build_open_gui_bat(asu_home=asu)
     assert "chcp 65001" in texto
+
+
+def test_open_gui_bat_semeia_start_dir():
+    """spec0011: o atalho classico manda a pasta do proprio .bat como semente."""
+    from pathlib import Path
+
+    from src.gui.launcher import build_open_gui_bat
+
+    conteudo = build_open_gui_bat(asu_home=Path("C:/asu"))
+    assert '--start-dir "%~dp0."' in conteudo
+    # Nao pode definir a raiz: o atalho classico segue generico.
+    assert "--root" not in conteudo

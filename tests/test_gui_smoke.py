@@ -422,6 +422,19 @@ def test_placeholder_do_backup_segue_a_raiz(app, tmp_path):
     assert str(tmp_path.resolve()) in dica  # a pasta-PAI, não a raiz
 
 
+def test_mainwindow_guarda_start_dir(app, tmp_path):
+    """A janela aceita `start_dir` sem que isso preencha a raiz."""
+    from PySide6.QtCore import QSettings
+
+    # Estado limpo: o QSettings (isolado, escopo de módulo) pode reter um
+    # `last_root` salvo por um teste anterior, o que faria `_restore_last_paths`
+    # preencher a raiz. O que importa aqui é que `start_dir` NÃO vira raiz.
+    QSettings("auto-script-updater", "gui").clear()
+    win = MainWindow(start_dir=str(tmp_path))
+    assert win._start_dir == str(tmp_path)
+    assert win.root_edit.text() == ""
+
+
 # ── spec 0002: indicador 🟡 "aplicado com ressalva" ───────────────────────
 
 

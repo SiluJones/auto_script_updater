@@ -180,10 +180,16 @@ class MainWindow(QMainWindow):
         root: str | None = None,
         instruction_dir: str | None = None,
         instruction: str | None = None,
+        start_dir: str | None = None,
     ) -> None:
         super().__init__()
         self.setWindowTitle("Atualizador Automático de Scripts")
         self.resize(1000, 640)
+
+        # Semente de navegação (spec0011): pasta onde os diálogos de "Escolher..."
+        # ABREM quando não há nada melhor. Diferente de `root`, NÃO define a raiz —
+        # o atalho .bat clássico é copiado para muitas pastas e continua genérico.
+        self._start_dir = start_dir or ""
 
         self._preview_report: ApplyReport | None = None
         # (raiz_usada, timestamp) da última aplicação — o Desfazer usa a raiz
@@ -341,7 +347,9 @@ class MainWindow(QMainWindow):
 
     # ── Seleção de caminhos ────────────────────────────────────────────────
     def _pick_root(self) -> None:
-        pasta = QFileDialog.getExistingDirectory(self, "Pasta raiz do projeto")
+        # Começa na raiz atual, se houver; senão na semente do atalho (--start-dir).
+        inicio = self.root_edit.text().strip() or self._start_dir
+        pasta = QFileDialog.getExistingDirectory(self, "Pasta raiz do projeto", inicio)
         if pasta:
             self.root_edit.setText(pasta)
 
@@ -873,9 +881,15 @@ def run(
     root: str | None = None,
     instruction_dir: str | None = None,
     instruction: str | None = None,
+    start_dir: str | None = None,
 ) -> int:
     """Ponto de entrada da GUI (``python -m src.gui``)."""
     app = QApplication.instance() or QApplication([])
-    win = MainWindow(root=root, instruction_dir=instruction_dir, instruction=instruction)
+    win = MainWindow(
+        root=root,
+        instruction_dir=instruction_dir,
+        instruction=instruction,
+        start_dir=start_dir,
+    )
     win.show()
     return app.exec()
