@@ -422,6 +422,29 @@ def test_placeholder_do_backup_segue_a_raiz(app, tmp_path):
     assert str(tmp_path.resolve()) in dica  # a pasta-PAI, não a raiz
 
 
+def test_start_dir_nao_restaura_ultima_raiz(app, tmp_path):
+    """spec0012: aberta com start_dir (atalho 'abrir GUI'), a janela começa LIMPA.
+
+    Regressão do print onde o atalho aberto em Artista trazia a raiz do Lunada
+    (last_root restaurado) e o 'Escolher...' abria no projeto errado.
+    """
+    from PySide6.QtCore import QSettings
+
+    QSettings("auto-script-updater", "gui").setValue("last_root", str(tmp_path / "anterior"))
+
+    win = MainWindow(start_dir=str(tmp_path))
+    assert win.root_edit.text() == ""  # NÃO restaurou a última raiz
+
+    # Sem start_dir, a restauração normal volta a valer.
+    win2 = MainWindow()
+    assert win2.root_edit.text() == str(tmp_path / "anterior")
+
+    # Limpa o QSettings (isolado, mas de escopo de módulo): este teste GRAVA
+    # last_root; sem limpar, interferiria nos testes irmãos (mesmo cuidado de
+    # test_mainwindow_guarda_start_dir).
+    QSettings("auto-script-updater", "gui").clear()
+
+
 def test_mainwindow_guarda_start_dir(app, tmp_path):
     """A janela aceita `start_dir` sem que isso preencha a raiz."""
     from PySide6.QtCore import QSettings

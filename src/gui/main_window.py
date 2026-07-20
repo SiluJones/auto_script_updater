@@ -438,6 +438,13 @@ class MainWindow(QMainWindow):
         return hashlib.sha256((raiz + "\x00" + texto).encode("utf-8")).hexdigest()
 
     def _restore_last_paths(self) -> None:
+        # Atalho "abrir GUI" (--start-dir presente): começa LIMPO — não restaura a
+        # última raiz/instrução. O atalho é genérico e copiado para pastas
+        # diferentes; restaurar o projeto anterior atrapalhava (spec0012). Quem
+        # quer voltar a um projeto usa o botão Recentes ▾. Sem --start-dir
+        # (execução manual de `python -m src.gui`), restaura a sessão como antes.
+        if self._start_dir:
+            return
         raiz = self._settings.value("last_root", "")
         instr = self._settings.value("last_instruction", "")
         if raiz:
