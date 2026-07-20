@@ -30,6 +30,24 @@ from src.gui.main_window import (  # noqa: E402
 _REPO = Path(__file__).resolve().parent.parent
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _isolate_qsettings(tmp_path_factory):
+    """Redireciona o QSettings da GUI para um .ini temporário.
+
+    Sem isto, `MainWindow` grava em `QSettings("auto-script-updater", "gui")` —
+    no Windows, o REGISTRO do usuário — e a suíte contamina a GUI real (foi o
+    que injetou um caminho `pytest-of-*/.../meu_backup` no campo Backup de um
+    usuário real). Ver DEC-032.
+    """
+    from PySide6.QtCore import QSettings
+
+    destino = str(tmp_path_factory.mktemp("qsettings"))
+    formato = QSettings.Format.IniFormat
+    QSettings.setPath(formato, QSettings.Scope.UserScope, destino)
+    QSettings.setDefaultFormat(formato)
+    yield
+
+
 @pytest.fixture(scope="module")
 def app():
     return QApplication.instance() or QApplication([])
@@ -373,8 +391,12 @@ def test_gui_tem_campo_backup(app):
     assert win.backup_edit.placeholderText() != ""
 
 
-def test_save_and_restore_backup_dir(app, tmp_path):
-    """_save_last_paths / _restore_last_paths incluem o backup-dir."""
+def test_backup_dir_nao_e_persistido(app, tmp_path):
+    """DEC-032: o backup-dir NÃO sobrevive à sessão — ele é derivado da raiz.
+
+    Regressão do bug em que um caminho salvo (inclusive um tmp de teste vazado
+    para o perfil real) 'grudava' e ignorava a troca de raiz.
+    """
     pasta = str(tmp_path / "meu_backup")
     win = MainWindow()
     win.backup_edit.setText(pasta)
@@ -383,7 +405,21 @@ def test_save_and_restore_backup_dir(app, tmp_path):
     win2 = MainWindow()
     win2._settings = win._settings  # compartilha o mesmo QSettings
     win2._restore_last_paths()
-    assert win2.backup_edit.text() == pasta
+    assert win2.backup_edit.text() == ""  # não restaurou nada
+
+
+def test_placeholder_do_backup_segue_a_raiz(app, tmp_path):
+    """O destino padrão exibido acompanha a raiz escolhida (pasta-pai/zz_backups)."""
+    from src.core.backup_manager import BACKUP_DIRNAME
+
+    projeto = tmp_path / "meu_projeto"
+    projeto.mkdir()
+    win = MainWindow()
+    win.root_edit.setText(str(projeto))
+
+    dica = win.backup_edit.placeholderText()
+    assert BACKUP_DIRNAME in dica
+    assert str(tmp_path.resolve()) in dica  # a pasta-PAI, não a raiz
 
 
 # ── spec 0002: indicador 🟡 "aplicado com ressalva" ───────────────────────

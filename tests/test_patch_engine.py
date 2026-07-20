@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from src.core.backup_manager import rollback_from_dir
+from src.core.backup_manager import BACKUP_DIRNAME, rollback_from_dir
 from src.core.file_locator import FileLocatorError, resolve_path
 from src.core.patch_engine import ModificationResult, apply_instruction
 from src.strategies.base_strategy import split_apply_result
@@ -108,7 +108,7 @@ def test_apply_writes_and_backs_up(tmp_path):
     assert report.ok
     assert "return 99" in f.read_text(encoding="utf-8")
     assert report.backup_dir is not None
-    # DEC-024c: padrão é parent(root)/backups/<ts>
+    # DEC-024c/DEC-032: padrão é parent(root)/zz_backups/<ts>
     assert Path(report.backup_dir).parent.parent == tmp_path.parent
 
 
@@ -347,7 +347,7 @@ def test_rollback_session_roundtrip(tmp_path):
     report = apply_instruction(instr, root_path=tmp_path, color=False)
     assert json.loads(f.read_text(encoding="utf-8"))["v"] == 2
 
-    # DEC-024c: backup em parent(root)/backups/<ts>; rollback_from_dir usa o path direto.
+    # DEC-024c/DEC-032: backup em parent(root)/zz_backups/<ts>; rollback_from_dir usa o path direto.
     rollback_from_dir(Path(report.backup_dir))
     assert json.loads(f.read_text(encoding="utf-8"))["v"] == 1
 
@@ -391,6 +391,32 @@ def test_cli_sandbox_applies_on_copy_not_original(tmp_path, monkeypatch):
     sb = sandboxes[0]
     assert _json.loads((sb / "cfg.json").read_text(encoding="utf-8"))["v"] == 2
     assert not (sb / "node_modules").exists()
+
+
+def test_backup_usa_pasta_zz_backups(tmp_path):
+    """DEC-032: a sessão de backup nasce em <backup_root>/zz_backups/<ts>."""
+    from src.core.backup_manager import BACKUP_DIRNAME, BackupManager
+
+    sess = BackupManager(backup_root=tmp_path)
+    assert sess.session_dir.parent.name == BACKUP_DIRNAME
+
+
+def test_rollback_encontra_layout_legado(tmp_path):
+    """Backups criados até a 0.8.7 (pasta `backups/`) continuam restauráveis."""
+    from src.core.backup_manager import LEGACY_BACKUP_DIRNAME, rollback_session
+
+    ts = "20250101_000000"
+    alvo = tmp_path / "arquivo.txt"
+    alvo.write_text("novo", encoding="utf-8")
+
+    sessao = tmp_path / LEGACY_BACKUP_DIRNAME / ts
+    espelho = sessao / "arquivo.txt"
+    espelho.parent.mkdir(parents=True, exist_ok=True)
+    espelho.write_text("antigo", encoding="utf-8")
+    (sessao / "manifest.txt").write_text(f"modificado\t{alvo}\t{espelho}\n", encoding="utf-8")
+
+    rollback_session(tmp_path, ts)
+    assert alvo.read_text(encoding="utf-8") == "antigo"
 
 
 def test_cli_print_report_mostra_ressalva(capsys):
@@ -478,8 +504,8 @@ def test_backup_location_keeps_project_clean(tmp_path):
 
     report = apply_instruction(instr, root_path=proj, backup_location=fora, color=False)
     assert report.ok
-    assert not (proj / "backups").exists()  # projeto limpo
-    # Estrutura nova: fora/<project_name>/<ts>  (sem subpasta 'backups')
+    assert not (proj / BACKUP_DIRNAME).exists()  # projeto limpo
+    # Estrutura nova: fora/<project_name>/<ts>  (sem subpasta de backup)
     assert Path(report.backup_dir).parent.parent == fora
     assert Path(report.backup_dir).parent.name == "proj"
     rollback_from_dir(Path(report.backup_dir))
@@ -487,7 +513,7 @@ def test_backup_location_keeps_project_clean(tmp_path):
 
 
 def test_history_log_accumulates(tmp_path):
-    """Cada aplicacao acrescenta uma linha a backups/history.log."""
+    """Cada aplicacao acrescenta uma linha a zz_backups/history.log."""
     import time
 
     proj = tmp_path / "proj"
@@ -500,8 +526,8 @@ def test_history_log_accumulates(tmp_path):
         time.sleep(1.05)  # timestamps distintos (pasta por segundo)
         apply_instruction(instr, root_path=proj, color=False)
 
-    # DEC-024c: padrão é parent(proj)/backups/history.log
-    history = (tmp_path / "backups" / "history.log").read_text(encoding="utf-8")
+    # DEC-024c/DEC-032: padrão é parent(proj)/zz_backups/history.log
+    history = (tmp_path / BACKUP_DIRNAME / "history.log").read_text(encoding="utf-8")
     assert history.count("\n") == 2
     assert "mudanca 1" in history and "mudanca 2" in history
 
@@ -510,7 +536,7 @@ def test_history_log_accumulates(tmp_path):
 
 
 def test_backup_padrao_pasta_pai(tmp_path):
-    """Padrão DEC-024c: sem backup_location o backup vai para parent(root)/backups/<ts>."""
+    """Padrão DEC-024c/DEC-032: sem backup_location, backup em parent(root)/zz_backups/<ts>."""
     proj = tmp_path / "meu_projeto"
     proj.mkdir()
     (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
@@ -519,10 +545,10 @@ def test_backup_padrao_pasta_pai(tmp_path):
     report = apply_instruction(instr, root_path=proj, color=False)
     assert report.ok
     session_dir = Path(report.backup_dir)
-    # Estrutura esperada: tmp_path/backups/<ts>  (parent do proj, sem aninhar por nome)
+    # Estrutura esperada: tmp_path/zz_backups/<ts>  (parent do proj, sem aninhar por nome)
     assert session_dir.parent.parent == tmp_path
-    assert session_dir.parent.name == "backups"
-    assert not (proj / "backups").exists()  # projeto limpo
+    assert session_dir.parent.name == BACKUP_DIRNAME
+    assert not (proj / BACKUP_DIRNAME).exists()  # projeto limpo
 
 
 def test_backup_externo_aninha_por_projeto(tmp_path):
@@ -540,7 +566,7 @@ def test_backup_externo_aninha_por_projeto(tmp_path):
     # Estrutura esperada: ext/meu_projeto/<ts>
     assert session_dir.parent.parent == ext
     assert session_dir.parent.name == "meu_projeto"
-    assert not (proj / "backups").exists()
+    assert not (proj / BACKUP_DIRNAME).exists()
 
 
 def test_backup_externo_history_por_projeto(tmp_path):
@@ -615,7 +641,7 @@ def test_rollback_from_dir_backup_externo(tmp_path):
 
 
 def test_backup_padrao_rollback_via_cli(tmp_path):
-    """rollback default (sem --backup-dir) acha o backup em parent(root)/backups."""
+    """rollback default (sem --backup-dir) acha o backup em parent(root)/zz_backups."""
     from src.__main__ import main
 
     proj = tmp_path / "proj"
@@ -630,8 +656,8 @@ def test_backup_padrao_rollback_via_cli(tmp_path):
     rc = main(["apply", str(instr_path), "--root", str(proj), "--yes", "--no-color"])
     assert rc == 0
     assert (proj / "f.txt").read_text(encoding="utf-8") == "novo\n"
-    # Backup em parent(proj)/backups/<ts>
-    backups = [p for p in (tmp_path / "backups").iterdir() if p.is_dir()]
+    # Backup em parent(proj)/zz_backups/<ts>
+    backups = [p for p in (tmp_path / BACKUP_DIRNAME).iterdir() if p.is_dir()]
     assert len(backups) == 1
     ts = backups[0].name
 
@@ -655,4 +681,4 @@ def test_backup_externo_nao_regride_dec024b(tmp_path):
     # Estrutura esperada: ext/meu_proj/<ts>  (aninha por projeto quando externo)
     assert session_dir.parent.parent == ext
     assert session_dir.parent.name == "meu_proj"
-    assert not (proj / "backups").exists()
+    assert not (proj / BACKUP_DIRNAME).exists()

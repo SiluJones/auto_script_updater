@@ -42,7 +42,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..core.backup_manager import rollback_from_dir
+from ..core.backup_manager import BACKUP_DIRNAME, rollback_from_dir
 from ..core.instruction_parser import (
     InstructionParseError,
     load_instruction_from_string,
@@ -324,6 +324,12 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Escolha a raiz e a instrução, depois pré-visualize.")
         self._restore_last_paths()
 
+        # O destino do backup segue a RAIZ (DEC-032): o placeholder exibe o
+        # caminho calculado e acompanha qualquer mudança — escolhida, digitada
+        # ou vinda dos argumentos de lançamento tratados logo abaixo.
+        self.root_edit.textChanged.connect(self._update_backup_placeholder)
+        self._update_backup_placeholder()
+
         # Sobrepõe com argumentos de lançamento (WI-2) — depois de _restore_last_paths.
         if root is not None:
             self.root_edit.setText(root)
@@ -340,9 +346,32 @@ class MainWindow(QMainWindow):
             self.root_edit.setText(pasta)
 
     def _pick_backup_dir(self) -> None:
-        pasta = QFileDialog.getExistingDirectory(self, "Pasta de backup (opcional)")
+        # Abre já na pasta-pai da raiz — que é o destino padrão (DEC-032).
+        inicio = ""
+        raiz = self.root_edit.text().strip()
+        if raiz:
+            try:
+                inicio = str(Path(raiz).resolve().parent)
+            except OSError:  # caminho inválido/inacessível — abre onde o Qt decidir
+                inicio = ""
+        pasta = QFileDialog.getExistingDirectory(self, "Pasta de backup (opcional)", inicio)
         if pasta:
             self.backup_edit.setText(pasta)
+
+    def _default_backup_hint(self) -> str:
+        """Texto do destino padrão do backup para a raiz atual (só exibição)."""
+        raiz = self.root_edit.text().strip()
+        if not raiz:
+            return "padrão: <pasta-pai da raiz>/" + BACKUP_DIRNAME
+        try:
+            destino = Path(raiz).resolve().parent / BACKUP_DIRNAME
+        except OSError:
+            return "padrão: <pasta-pai da raiz>/" + BACKUP_DIRNAME
+        return f"padrão: {destino}"
+
+    def _update_backup_placeholder(self) -> None:
+        """Mantém o placeholder do campo Backup sincronizado com a raiz atual."""
+        self.backup_edit.setPlaceholderText(self._default_backup_hint())
 
     def _pick_instruction(self) -> None:
         start = self._instruction_start_dir or ""
@@ -403,19 +432,20 @@ class MainWindow(QMainWindow):
     def _restore_last_paths(self) -> None:
         raiz = self._settings.value("last_root", "")
         instr = self._settings.value("last_instruction", "")
-        bkp = self._settings.value("last_backup_dir", "")
         if raiz:
             self.root_edit.setText(str(raiz))
         if instr and instr != self.PASTED_MARK:
             self.instr_edit.setText(str(instr))
-        if bkp:
-            self.backup_edit.setText(str(bkp))
+        # O backup-dir NÃO é restaurado (DEC-032): ele é DERIVADO da raiz a cada
+        # sessão. Persistir um caminho absoluto fazia o destino "grudar" e ignorar
+        # a troca de raiz — era o bug relatado. Campo vazio = padrão da raiz.
 
     def _save_last_paths(self) -> None:
         self._settings.setValue("last_root", self.root_edit.text().strip())
         if self.instr_edit.text() != self.PASTED_MARK:
             self._settings.setValue("last_instruction", self.instr_edit.text().strip())
-        self._settings.setValue("last_backup_dir", self.backup_edit.text().strip())
+        # `last_backup_dir` deixou de ser salvo (DEC-032). A chave antiga que
+        # eventualmente exista no perfil do usuário simplesmente não é mais lida.
 
     # ── Recentes e fixadas (WI-1) ──────────────────────────────────────────
     def _load_recent_roots(self) -> list[str]:

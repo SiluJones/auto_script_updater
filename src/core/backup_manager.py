@@ -28,6 +28,15 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+# Nome da pasta que agrupa as sessões de backup (DEC-032). O prefixo "zz" é
+# deliberado: mantém a pasta no FIM da listagem alfabética da pasta-pai, longe
+# do projeto. Sem espaço no nome — caminho com espaço vira erro de aspas quando
+# colado à mão em CMD/.bat.
+BACKUP_DIRNAME = "zz_backups"
+# Nome anterior (<= 0.8.7). Só é consultado na LEITURA (rollback), para que
+# backups já existentes em disco continuem restauráveis.
+LEGACY_BACKUP_DIRNAME = "backups"
+
 
 @dataclass
 class _Entry:
@@ -95,7 +104,7 @@ class BackupManager:
         """Diretório desta sessão de backup."""
         if self.project_name:
             return Path(self.backup_root) / self.project_name / self.timestamp
-        return Path(self.backup_root) / "backups" / self.timestamp
+        return Path(self.backup_root) / BACKUP_DIRNAME / self.timestamp
 
     def register(self, path: Path) -> None:
         """Registra (e copia, se existir) um arquivo antes de escrevê-lo."""
@@ -147,7 +156,7 @@ class BackupManager:
         if self.project_name:
             backups_dir = Path(self.backup_root) / self.project_name
         else:
-            backups_dir = Path(self.backup_root) / "backups"
+            backups_dir = Path(self.backup_root) / BACKUP_DIRNAME
         backups_dir.mkdir(parents=True, exist_ok=True)
         history = backups_dir / "history.log"
         n_mod = sum(1 for e in self._entries if e.existed)
@@ -251,7 +260,12 @@ def rollback_session(backup_root: Path, timestamp: str) -> list[str]:
     Raises:
         FileNotFoundError: se a sessão/manifesto não existir.
     """
-    session_dir = Path(backup_root) / "backups" / timestamp
+    session_dir = Path(backup_root) / BACKUP_DIRNAME / timestamp
+    if not session_dir.exists():
+        # Compatibilidade: backups criados até a 0.8.7 ficam em `backups/`.
+        legado = Path(backup_root) / LEGACY_BACKUP_DIRNAME / timestamp
+        if legado.exists():
+            session_dir = legado
     return rollback_from_dir(session_dir)
 
 

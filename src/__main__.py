@@ -266,7 +266,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_app.add_argument(
         "--backup-dir",
         metavar="PASTA",
-        help="Onde criar a pasta backups/ (padrão: pasta-pai da raiz, fora do projeto). "
+        help="Onde criar a pasta zz_backups/ (padrão: pasta-pai da raiz, fora do projeto). "
         "Útil para apontar para uma pasta compartilhada de backups.",
     )
     p_app.add_argument(
@@ -285,11 +285,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_rb = sub.add_parser("rollback", help="Desfaz uma aplicação a partir do timestamp do backup.")
     p_rb.add_argument("timestamp", help="Timestamp da sessão (ex.: 20260607_231500).")
-    p_rb.add_argument("--root", help="Pasta raiz onde está a pasta backups/.")
+    p_rb.add_argument("--root", help="Pasta raiz onde está a pasta zz_backups/.")
     p_rb.add_argument(
         "--backup-dir",
         metavar="PASTA",
-        help="Pasta que contém backups/ (use a mesma de --backup-dir do apply, se usou).",
+        help="Pasta que contém zz_backups/ (use a mesma de --backup-dir do apply, se usou).",
     )
     p_rb.set_defaults(func=_cmd_rollback)
 

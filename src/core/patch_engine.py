@@ -32,7 +32,8 @@ SANDBOX_IGNORES = (
     "venv",
     "env",
     "node_modules",
-    "backups",
+    "backups",  # layout <= 0.8.7 (mantido: projetos antigos ainda têm essa pasta)
+    "zz_backups",
     ".pytest_cache",
     ".ruff_cache",
     ".mypy_cache",
