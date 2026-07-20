@@ -7,6 +7,14 @@
 
 ---
 
+## [0.9.1] — 2026-07-20
+### Adicionado
+- **`--start-dir` na GUI e no atalho "abrir GUI" (spec0011):** o `.bat` clássico passa a mandar `--start-dir "%~dp0."`, então os diálogos de "Escolher..." abrem **na pasta onde o `.bat` está** — que é para onde o usuário copia o atalho, junto dos projetos. O argumento apenas SEMEIA a navegação; **não define a raiz** (o atalho clássico continua genérico). O seletor de raiz usa, nesta ordem: a raiz já preenchida → a semente → o padrão do Qt. Sem o argumento, o comportamento é o de antes. Estende DEC-022/DEC-023 (incluindo o truque `"%~dp0."`, que evita a barra invertida escapando a aspa).
+### Testes / Qualidade
+- Testes novos: o `.bat` contém `--start-dir "%~dp0."` e não contém `--root`; `MainWindow(start_dir=...)` guarda a semente sem preencher a raiz. `ruff`/`black`/`self-test` limpos. `__version__` 0.9.0 → **0.9.1**.
+
+---
+
 ## [0.9.0] — 2026-07-20
 ### Corrigido
 - **Endereçamento do backup voltou a seguir a RAIZ (spec0010, DEC-032).** Duas causas somadas: (1) a GUI persistia `last_backup_dir` no `QSettings` e nunca re-derivava o destino, então um caminho escolhido uma vez "grudava" e ignorava a troca de raiz; (2) a suíte de testes gravava no `QSettings` REAL (no Windows, o registro do usuário) — `test_save_and_restore_backup_dir` chegou a injetar um caminho `pytest-of-*/.../meu_backup` na GUI de um usuário real. O engine estava correto o tempo todo. Agora: campo vazio = destino derivado da raiz; o placeholder exibe o caminho calculado e acompanha a troca de raiz; o campo não é mais persistido; os testes rodam com `QSettings` isolado em `.ini` temporário.
