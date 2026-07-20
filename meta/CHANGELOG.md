@@ -7,6 +7,14 @@
 
 ---
 
+## [0.9.2] — 2026-07-20
+### Corrigido
+- **Atalho "abrir GUI" começa limpo (spec0012, ajuste da spec0011).** Antes, a GUI restaurava a última raiz do `QSettings` mesmo quando aberta pelo atalho genérico — então clicar o `.bat` numa pasta nova ainda trazia o projeto anterior, e o "Escolher..." abria no lugar errado (relatado com print: atalho em `Artista`, raiz vinda de `Lunada`). Agora, quando a GUI é aberta com `--start-dir` (a marca do atalho "abrir GUI"), ela **não restaura** a última raiz/instrução e o "Escolher..." abre na pasta do próprio `.bat`. O botão **Recentes ▾** segue disponível para retomar um projeto anterior. Execução manual (`python -m src.gui`, sem `--start-dir`) continua restaurando a sessão como antes.
+### Testes / Qualidade
+- Teste novo: com `start_dir`, a janela não restaura `last_root`; sem ele, restaura. `ruff`/`black`/`self-test` limpos. `__version__` 0.9.1 → **0.9.2**.
+
+---
+
 ## [0.9.1] — 2026-07-20
 ### Adicionado
 - **`--start-dir` na GUI e no atalho "abrir GUI" (spec0011):** o `.bat` clássico passa a mandar `--start-dir "%~dp0."`, então os diálogos de "Escolher..." abrem **na pasta onde o `.bat` está** — que é para onde o usuário copia o atalho, junto dos projetos. O argumento apenas SEMEIA a navegação; **não define a raiz** (o atalho clássico continua genérico). O seletor de raiz usa, nesta ordem: a raiz já preenchida → a semente → o padrão do Qt. Sem o argumento, o comportamento é o de antes. Estende DEC-022/DEC-023 (incluindo o truque `"%~dp0."`, que evita a barra invertida escapando a aspa).
