@@ -9,10 +9,10 @@ aplica com um comando — ou pela interface gráfica.
 > Documentação de contexto completa (visão, arquitetura, decisões, armadilhas):
 > ver `meta/CONTEXT.md`, `meta/DECISIONS.md` e `meta/ROADMAP.md`.
 
-## Estado atual — 0.8.5
+## Estado atual — 0.9.2
 
 O núcleo (CLI) e a interface gráfica (PySide6) estão funcionais e testados
-(**147 testes**). A GUI reusa exatamente a mesma pilha do CLI
+(**158 testes**). A GUI reusa exatamente a mesma pilha do CLI
 (`parser → validator → engine`), sem lógica própria.
 
 Implementado:
@@ -27,24 +27,32 @@ Implementado:
   `delete_json_path`); arquivo inteiro (`create_file`, `replace_file`).
 - Resolução de caminhos (relativo à raiz / absoluto) com guarda de contenção.
 - **Backup obrigatório** timestampado + **rollback** atômico (automático em falha
-  e manual por timestamp). Por padrão o backup vai para **fora do repositório**
-  (`parent(raiz)/backups/<timestamp>/`); configurável via `--backup-dir`.
+  e manual por timestamp). Por padrão o backup vai para **fora do repositório**,
+  num destino **derivado da raiz** (`parent(raiz)/zz_backups/<timestamp>/`) — o
+  prefixo `zz_` mantém a pasta no fim da listagem, longe do projeto. Trocar a
+  raiz troca o destino junto; configurável via `--backup-dir`. Backups antigos
+  em `backups/` continuam restauráveis.
 - Log consolidado `history.log`: uma linha por aplicação **e também por rollback
   manual** (Desfazer na GUI, `rollback` no CLI, `self-test`).
 - **Canal de avisos não-fatais ("ressalva")** — um terceiro estado, *aplicado com
   ressalva*, entre sucesso e erro (ex.: `create_file` sobre um arquivo que já
   existe avisa da sobrescrita). O aviso **não aborta nem reverte** a aplicação; na
-  GUI aparece como 🟡 na árvore (DEC-028).
+  GUI aparece como 🟡 na árvore e no CLI como `~` por arquivo, contado no resumo
+  (`N com ressalva`), com uma linha de atenção quando houver (DEC-028).
 - **Dica acionável do validador** quando a âncora de um `replace_context_block`
   fica vazia por tocar a borda do arquivo: a mensagem sugere alternativas
   (`replace_line_pattern`, `insert_before_pattern`, `replace_section`,
   `replace_function`).
-- Renderização de diff colorido (unified diff).
+- Renderização de diff colorido (unified diff). Na GUI, com **Pygments**
+  instalado (dependência de GUI), o diff ganha **realce de sintaxe** por token,
+  com o lexer escolhido pelo nome do arquivo; sem Pygments, ou em extensão
+  desconhecida, cai no realce só-de-linha de sempre.
 - CLI com `validate`, `apply` (prévia + confirmação), `rollback`, `self-test`,
   `--sandbox`.
-- GUI: recentes/fixadas, atalhos `.bat` por projeto, campo de backup, colar
-  instrução da área de transferência, copiar erro para a IA, **copiar a saída
-  completa** da prévia/aplicação, e o indicador de ressalva 🟡.
+- GUI: recentes/fixadas, atalhos `.bat` por projeto e "abrir GUI", campo de
+  backup que mostra o destino calculado, colar instrução da área de
+  transferência, copiar erro para a IA, **copiar a saída completa** da
+  prévia/aplicação, e o indicador de ressalva 🟡.
 - Encodings seguros: BOM UTF-8 preservado (roundtrip com Visual Studio); cp1252
   e CRLF preservados; UTF-16/32 rejeitados com erro claro.
 - Multilinguagem comprovada por teste (C#, C++, Java, JSX, TSX, GDScript).
@@ -87,9 +95,10 @@ python -m src rollback <TIMESTAMP> --root examples\demo_project
 - O 3º aplica de verdade (cria backup e pede confirmação); ao final imprime o `Backup: ...\<TIMESTAMP>`.
 - O 4º desfaz tudo: copie o `<TIMESTAMP>` impresso pelo passo anterior (ex.: `20260610_041628`).
 
-Por padrão o backup vai para a **pasta-pai** da raiz (fora do projeto), então o
-repositório fica limpo. Para desfazer, o `rollback` procura no mesmo lugar
-automaticamente; se você usou `--backup-dir`, repita a mesma flag no rollback.
+Por padrão o backup vai para `zz_backups/` na **pasta-pai** da raiz (fora do
+projeto), então o repositório fica limpo. Para desfazer, o `rollback` procura no
+mesmo lugar automaticamente — inclusive na pasta `backups/` de versões
+anteriores; se você usou `--backup-dir`, repita a mesma flag no rollback.
 
 > Nota: `examples\exemplo_instrucao.yaml` é apenas **ilustrativo** — aponta para
 > caminhos fictícios e **não roda** como está. Para testar de fato, use
@@ -110,7 +119,8 @@ python -m src rollback <TIMESTAMP> --root C:\meu_projeto
 Flags úteis do `apply`: `--dry-run` (simula sem escrever), `--yes`/`-y` (aplica
 sem perguntar), `--no-color` (saída sem cores), `--no-backup` (não recomendado),
 `--sandbox` (aplica numa cópia irmã), `--backup-dir PASTA` (onde criar a pasta
-`backups/`). O `rollback` aceita `--root` e `--backup-dir`.
+de backups, em vez do `zz_backups/` derivado da raiz). O `rollback` aceita
+`--root` e `--backup-dir`.
 
 ## Interface gráfica
 
@@ -126,9 +136,14 @@ Escolha a raiz e a instrução, clique **Pré-visualizar (dry-run)** para ver a
 por arquivo, com cada modificação marcada ✓/✗; quando uma aplicação passa **com
 ressalva** (ver o canal de avisos abaixo), o arquivo aparece como 🟡 e a
 modificação como ⚠, com o texto do aviso no tooltip (precedência 🔴 > 🟡 > 🟢 > ⚪).
+Com **Pygments** instalado, o diff sai com realce de sintaxe; nesse modo as
+linhas adicionadas/removidas são marcadas pelo **fundo** (verde/vermelho claros)
+e as cores do texto ficam por conta da sintaxe.
 Recursos de conveniência:
 - **Recentes ▾** (até 8) e botão **📌** para fixar as raízes que você mais usa.
-- Campo **Backup:** para escolher onde o backup é criado (expõe o `--backup-dir`).
+- Campo **Backup:** para escolher onde o backup é criado (expõe o
+  `--backup-dir`). Deixe **vazio** para usar o padrão: o texto acinzentado
+  mostra o destino calculado a partir da raiz atual e acompanha a troca de raiz.
 - **Colar instrução** — lê o YAML direto da área de transferência, sem salvar arquivo.
 - **Copiar erro para a IA** — em falha, copia um bloco pronto (erro + referência
   do guia) para colar na IA geradora e corrigir a instrução.
@@ -137,8 +152,14 @@ Recursos de conveniência:
   **falha**. Complementa o "Copiar erro para a IA" (que só surge em falha) — útil
   para colar num chat ou guardar registro da execução.
 - **Aplicar em sandbox (cópia)** — paridade com o `--sandbox` do CLI.
-- **Criar atalho .bat…** — gera um atalho por projeto (reabre a GUI já apontada)
-  e um atalho clássico "abrir GUI".
+- **Criar atalho .bat…** — gera um atalho **por projeto**, que reabre a GUI já
+  apontada para aquela raiz e aquela pasta de instrução.
+- **Criar atalho .bat (abrir GUI)…** — atalho **genérico**, sem console. Copie-o
+  para a pasta onde você guarda seus projetos: ao abrir por ele, a GUI começa
+  **limpa** (não traz a raiz do projeto anterior) e os diálogos de "Escolher..."
+  abrem **na pasta do próprio `.bat`**. O menu **Recentes ▾** continua ali para
+  retomar um projeto anterior. Abrindo a GUI na mão (`python -m src.gui`), o
+  comportamento antigo se mantém: a última sessão é restaurada.
 
 Passo a passo detalhado (com as decisões de fluxo e dicas): ver
 `docs/GUIA_PASSO_A_PASSO.md`.

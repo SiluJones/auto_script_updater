@@ -71,6 +71,11 @@ Fluxo:
 3. **Pré-visualizar (dry-run):** mostra a árvore de arquivos com 🟢 (ok) / 🔴
    (falha) / ⚪ (inalterado), cada modificação com ✓/✗, e o **diff colorido**.
    Nada é escrito ainda. **Sempre revise aqui antes de aplicar.**
+   - Se você instalou as dependências de GUI, o diff vem com **realce de
+     sintaxe** (a linguagem é deduzida do nome do arquivo): as linhas
+     adicionadas e removidas ganham **fundo** verde/vermelho claro, e as cores do
+     texto passam a ser as da sintaxe. Em arquivo de extensão desconhecida, cai
+     no realce simples de antes — nada quebra.
    - Um arquivo pode aparecer como 🟡 (**aplicado com ressalva**) — deu certo,
      mas com um aviso a conferir (ex.: um `create_file` que vai **sobrescrever**
      um arquivo já existente). Passe o mouse sobre o item para ler o aviso no
@@ -88,12 +93,24 @@ avisos 🟡 e diffs), tanto quando deu certo quanto quando falhou. Diferente do
 "Copiar erro para a IA" (que só aparece em falha), o "Copiar saída" funciona nos
 dois casos — bom para colar num chat, anexar num relato ou manter registro.
 
-### Atalho por projeto (.bat)
+### Atalhos .bat — dois tipos, para dois usos
 
-O botão **Criar atalho .bat…** gera um atalho que reabre a GUI **já apontada**
-para aquele projeto e aquela pasta de instrução. Guarde-o ao lado do projeto.
-Há também o **"Criar atalho .bat (abrir GUI)"** clássico, que só abre a
-interface (sem console), para você deixar na Área de Trabalho.
+**Criar atalho .bat…** gera um atalho **por projeto**: reabre a GUI já apontada
+para aquela raiz e aquela pasta de instrução. Guarde-o ao lado do projeto.
+
+**Criar atalho .bat (abrir GUI)…** gera o atalho **genérico**, sem console. A
+ideia é copiá-lo para a pasta onde você guarda seus projetos (ou para a Área de
+Trabalho). Duas coisas que ele faz por você:
+
+- **Começa limpo.** Aberto por esse atalho, a GUI **não** restaura a raiz do
+  projeto anterior — se você copiou o `.bat` para uma pasta nova, ela não chega
+  trazendo o projeto de ontem. O menu **Recentes ▾** continua disponível para
+  retomar o que quiser.
+- **Abre no lugar certo.** O "Escolher..." abre **na pasta onde o `.bat` está**,
+  que normalmente é onde os projetos moram — não no último caminho usado.
+
+Abrindo a GUI na mão (`python -m src.gui`), o comportamento é o de sempre: a
+última raiz e a última instrução são restauradas.
 
 ---
 
@@ -110,15 +127,28 @@ O `--dry-run` é o teste seguro (não escreve). O `apply` sem `--dry-run` aplica
 de verdade, pedindo confirmação, e imprime o caminho do backup ao final — copie
 o `<TIMESTAMP>` de lá para um eventual `rollback`.
 
+A saída marca com `~` cada arquivo aplicado **com ressalva** e conta esses casos
+no resumo (`N com ressalva`), com uma linha de atenção no fim — a mesma
+informação que a GUI mostra como 🟡, para você não perder o aviso na linha de
+comando.
+
 ---
 
 ## 5. Backup: onde fica, como configurar, como desligar
 
 - **Padrão:** o backup vai para a **pasta-pai** da raiz
-  (`parent(raiz)\backups\<timestamp>\`) — fora do projeto, para não sujar o
-  repositório. O `rollback` procura nesse mesmo lugar automaticamente.
+  (`parent(raiz)\zz_backups\<timestamp>\`) — fora do projeto, para não sujar o
+  repositório; o prefixo `zz_` empurra a pasta para o fim da listagem, longe do
+  que você usa. O destino é **derivado da raiz**: trocou a raiz, trocou o
+  destino. O `rollback` procura nesse mesmo lugar automaticamente — e também na
+  pasta `backups\` das versões anteriores, então backups antigos continuam
+  restauráveis.
 - **Escolher outro lugar:** use `--backup-dir PASTA` (no CLI) ou o campo
   **Backup:** (na GUI). Bom para mandar todos os backups para uma pasta central.
+  Na GUI, deixe o campo **vazio** para usar o padrão: o texto acinzentado mostra
+  exatamente para onde o backup vai, e muda sozinho quando você troca a raiz.
+  O que você digitar ali vale só para aquela sessão — o campo não é memorizado
+  entre aberturas, justamente para não "grudar" num caminho antigo.
   Quando o backup é externo e você tem vários projetos, o ASU aninha por nome do
   projeto (`PASTA\<nome-do-projeto>\<timestamp>\`) para não misturar. Nesse caso,
   repita o mesmo `--backup-dir` no `rollback`.
@@ -191,3 +221,10 @@ ciclo: a IA lê o erro, corrige a instrução, você reaplica.
 - **"Dá para criar um arquivo novo com o ASU?"** Dá (`create_file`), mas para um
   arquivo novo isolado costuma ser mais simples pedir o arquivo pronto para
   baixar. O ASU compensa mesmo é **editando** arquivos existentes.
+- **"Abri pelo atalho e a raiz veio vazia — perdi meus projetos?"** Não. O
+  atalho "abrir GUI" começa limpo de propósito, para não trazer o projeto
+  anterior quando você o copia para uma pasta nova. Clique em **Recentes ▾**:
+  seus projetos estão todos lá.
+- **"Meus backups antigos ficaram em `backups\`. Ainda dá para desfazer?"** Dá.
+  A pasta padrão passou a ser `zz_backups\`, mas o rollback continua lendo o
+  layout antigo. Nada do que já existe precisa ser movido.

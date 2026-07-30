@@ -48,4 +48,5 @@ logs/*
 meta/workorders/*
 !meta/workorders/_TEMPLATE.md
 meta/DECISIONS-archive.md
+INSTRUCOES-DO-PROJETO.md
 # <<<
