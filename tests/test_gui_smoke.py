@@ -580,3 +580,22 @@ def test_report_to_text_despeja_relatorio_inteiro():
     assert "aviso: match por whitespace" in texto
     assert "casou 0 vez(es)" in texto
     assert "+new" in texto  # o diff entra na saida
+
+
+# ── wo0015: origem do backup ─────────────────────────────────────────────────
+
+
+def test_instruction_label_por_arquivo(app, tmp_path):
+    """Com um caminho de instrucao no campo, _instruction_label() devolve so o basename."""
+    win = MainWindow()
+    caminho = tmp_path / "minha_instrucao.yaml"
+    win.instr_edit.setText(str(caminho))
+    assert win._instruction_label() == "minha_instrucao.yaml"
+
+
+def test_instruction_label_por_colagem(app):
+    """Apos o fluxo de colar, _instruction_label() devolve o marcador de colagem."""
+    win = MainWindow()
+    QApplication.clipboard().setText("format_version: '1.0'\ndescription: x\nfiles: []\n")
+    win._paste_instruction()
+    assert win._instruction_label() == "(colado da área de transferência)"

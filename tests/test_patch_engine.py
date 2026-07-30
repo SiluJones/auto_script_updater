@@ -637,6 +637,116 @@ def test_rollback_from_dir_backup_externo(tmp_path):
     assert (proj / "f.txt").read_text(encoding="utf-8") == "antigo\n"
 
 
+# ── wo0015: origem do backup (qual instrução gerou a sessão) ─────────────────
+
+
+def test_manifesto_grava_cabecalho_de_origem(tmp_path):
+    """instruction_label vira linha `# Instrução: <arquivo>` no manifesto, antes das entradas."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
+    instr = _instr([_txt_file("f.txt", _replace_file_mod("novo\n"))])
+
+    report = apply_instruction(
+        instr, root_path=proj, color=False, instruction_label="260730-asu0001.yaml"
+    )
+    linhas = (Path(report.backup_dir) / "manifest.txt").read_text(encoding="utf-8").splitlines()
+    assert "# Instrução: 260730-asu0001.yaml" in linhas
+    primeira_entrada = next(
+        i for i, linha in enumerate(linhas) if linha and not linha.startswith("#")
+    )
+    assert linhas.index("# Instrução: 260730-asu0001.yaml") < primeira_entrada
+
+
+def test_manifesto_sem_rotulo_nao_grava_cabecalho(tmp_path):
+    """Sem instruction_label, nenhuma linha `# Instrução:` aparece — nada de cabeçalho vazio."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
+    instr = _instr([_txt_file("f.txt", _replace_file_mod("novo\n"))])
+
+    report = apply_instruction(instr, root_path=proj, color=False)
+    linhas = (Path(report.backup_dir) / "manifest.txt").read_text(encoding="utf-8").splitlines()
+    assert not any(linha.startswith("# Instrução:") for linha in linhas)
+
+
+def test_rollback_com_cabecalho_de_origem_no_manifesto_novo(tmp_path):
+    """O cabeçalho novo não confunde o parser do rollback (linhas '#' já eram ignoradas)."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
+    instr = _instr([_txt_file("f.txt", _replace_file_mod("novo\n"))])
+
+    report = apply_instruction(
+        instr, root_path=proj, color=False, instruction_label="minha_instrucao.yaml"
+    )
+    assert (proj / "f.txt").read_text(encoding="utf-8") == "novo\n"
+
+    rollback_from_dir(Path(report.backup_dir))
+    assert (proj / "f.txt").read_text(encoding="utf-8") == "antigo\n"
+
+
+def test_rollback_manifesto_antigo_sem_cabecalho_de_origem(tmp_path):
+    """Regressão: manifestos gravados ANTES desta feature (sem `# Instrução:`) continuam
+    restauráveis nos dois formatos — tab novo (pós-FIX-008) e `[estado] caminho` (legado)."""
+    from src.core.backup_manager import mirror_path
+
+    # (a) formato tab, sem cabeçalho de instrução (como todo manifesto pré-wo0015).
+    alvo_a = tmp_path / "a.txt"
+    alvo_a.write_text("novo\n", encoding="utf-8")
+    sessao_a = tmp_path / "sessao_a"
+    espelho_a = sessao_a / "a.txt"
+    espelho_a.parent.mkdir(parents=True, exist_ok=True)
+    espelho_a.write_text("antigo\n", encoding="utf-8")
+    (sessao_a / "manifest.txt").write_text(
+        f"# Backup de 20250101_000000\n\nmodificado\t{alvo_a}\t{espelho_a}\n", encoding="utf-8"
+    )
+    assert rollback_from_dir(sessao_a)
+    assert alvo_a.read_text(encoding="utf-8") == "antigo\n"
+
+    # (b) formato legado `[estado] caminho` (pré-FIX-008).
+    alvo_b = tmp_path / "b.txt"
+    alvo_b.write_text("novo\n", encoding="utf-8")
+    sessao_b = tmp_path / "sessao_b"
+    mirror_b = mirror_path(sessao_b, alvo_b)
+    mirror_b.parent.mkdir(parents=True, exist_ok=True)
+    mirror_b.write_text("antigo\n", encoding="utf-8")
+    (sessao_b / "manifest.txt").write_text(f"[modificado] {alvo_b}\n", encoding="utf-8")
+    assert rollback_from_dir(sessao_b)
+    assert alvo_b.read_text(encoding="utf-8") == "antigo\n"
+
+
+def test_history_log_grava_origem_no_terceiro_campo(tmp_path):
+    """Origem entra como terceiro campo tab, sempre escrito (vazio quando desconhecida)."""
+    import time
+
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    (proj / "f.txt").write_text("antigo\n", encoding="utf-8")
+
+    instr1 = _instr([_txt_file("f.txt", _replace_file_mod("v1\n"))])
+    instr1["description"] = "com rotulo"
+    apply_instruction(instr1, root_path=proj, color=False, instruction_label="minha.yaml")
+
+    time.sleep(1.05)  # timestamps distintos (pasta/linha por segundo)
+
+    instr2 = _instr([_txt_file("f.txt", _replace_file_mod("v2\n"))])
+    instr2["description"] = ""
+    apply_instruction(instr2, root_path=proj, color=False)  # sem instruction_label
+
+    history_text = (tmp_path / BACKUP_DIRNAME / "history.log").read_text(encoding="utf-8")
+    linhas = [linha for linha in history_text.splitlines() if linha]
+    assert len(linhas) == 2
+
+    campos_com_rotulo = linhas[0].split("\t")
+    assert len(campos_com_rotulo) == 3
+    assert campos_com_rotulo[2] == "minha.yaml  com rotulo"
+
+    campos_sem_rotulo = linhas[1].split("\t")
+    assert len(campos_sem_rotulo) == 3  # mesmo numero de tabs, mesmo sem rotulo
+    assert campos_sem_rotulo[2] == ""
+
+
 # ── DEC-024c: padrão backup na pasta-pai ─────────────────────────────────────
 
 

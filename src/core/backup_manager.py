@@ -87,11 +87,17 @@ class BackupManager:
         project_name: quando fornecido (backup externo), substitui ``backups/``
             como agrupador: sessão fica em ``<backup_root>/<project_name>/<ts>``
             e ``history.log`` em ``<backup_root>/<project_name>/``.
+        instruction_label: nome do arquivo de instrução que originou a sessão
+            (ou marcador de colagem). Só rótulo para leitura humana — quem o
+            conhece é o chamador (CLI/GUI), não o engine. ``None`` = origem
+            desconhecida (chamada programática, teste), e nesse caso o cabeçalho
+            do manifesto simplesmente não é escrito.
     """
 
     backup_root: Path
     root: Path | None = None
     project_name: str | None = None
+    instruction_label: str | None = None
     timestamp: str = field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
     _entries: list[_Entry] = field(default_factory=list, init=False)
 
@@ -132,10 +138,19 @@ class BackupManager:
         Formato por linha: ``[estado]<TAB>caminho_original<TAB>caminho_espelho``
         (o espelho fica vazio para arquivos criados). Gravar o espelho explícito
         torna o rollback independente de qualquer heurística de caminho.
+
+        A origem (qual instrução gerou a sessão) entra como linha de CABEÇALHO,
+        não como quarta coluna: é um dado da SESSÃO, não de cada arquivo — como
+        coluna se repetiria em toda linha e mexeria no formato que o rollback
+        consome. Como comentário, o parser existente já a ignora, então a
+        compatibilidade sai de graça (ver ``rollback_from_dir``).
         """
         self.session_dir.mkdir(parents=True, exist_ok=True)
         manifest = self.session_dir / "manifest.txt"
-        linhas = [f"# Backup de {self.timestamp}", ""]
+        linhas = [f"# Backup de {self.timestamp}"]
+        if self.instruction_label:
+            linhas.append(f"# Instrução: {self.instruction_label}")
+        linhas.append("")
         for entry in self._entries:
             estado = "modificado" if entry.existed else "criado"
             espelho = str(entry.backup_copy) if entry.backup_copy is not None else ""
@@ -151,6 +166,12 @@ class BackupManager:
         usuário). Cada linha: ``<timestamp>  <n> arquivo(s)  <descrição>``. É
         complementar ao manifesto por sessão (que continua sendo a fonte para o
         rollback) — aqui é só leitura humana cronológica.
+
+        A origem entra como TERCEIRO campo tab, antes da descrição, e é escrita
+        SEMPRE (vazia quando desconhecida) para que a posição da coluna seja
+        estável: o log é lido por humano hoje, mas é o candidato natural a
+        alimentar a futura tela de "seleção de timestamps antigos no Desfazer",
+        e aí campo em posição fixa se paga.
         """
         # Quando há project_name (backup externo), history.log fica ao lado das sessões.
         if self.project_name:
@@ -163,7 +184,8 @@ class BackupManager:
         n_new = sum(1 for e in self._entries if not e.existed)
         resumo = f"{n_mod} modificado(s), {n_new} criado(s)"
         desc = f"  {description}" if description else ""
-        linha = f"{self.timestamp}\t{resumo}{desc}\n"
+        origem = self.instruction_label or ""
+        linha = f"{self.timestamp}\t{resumo}\t{origem}{desc}\n"
         with history.open("a", encoding="utf-8") as fh:
             fh.write(linha)
         return history

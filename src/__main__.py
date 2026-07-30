@@ -146,6 +146,7 @@ def _cmd_apply(args: argparse.Namespace) -> int:
         backup=False if args.no_backup else None,
         backup_location=getattr(args, "backup_dir", None),
         color=color,
+        instruction_label=Path(args.instruction).name,
     )
     _print_report(report)
     if report.backup_dir and not args.dry_run:

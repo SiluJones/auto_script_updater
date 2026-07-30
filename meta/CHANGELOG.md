@@ -4,6 +4,11 @@
 > **Cresce**: entradas novas no topo. Registra só o que foi de fato concluído/entregue.
 
 ## [Não lançado]
+
+## [0.9.3] — 2026-07-30
+### Adicionado
+- **O backup agora registra de ONDE veio.** O `manifest.txt` da sessão ganha uma linha de cabeçalho `# Instrução: <arquivo>` e o `history.log` passa a trazer o nome do arquivo de instrução num terceiro campo, antes da descrição. Com várias instruções circulando pelo mesmo projeto, dá para escolher o timestamp certo no Desfazer sem abrir cada pasta. Aplicação vinda de **Colar instrução** grava `(colado da área de transferência)` — nunca campo vazio. Só o nome do arquivo é gravado (nunca o caminho completo, que vazaria a estrutura de pastas ao compartilhar o manifesto). **Nenhuma mudança de formato:** a origem é cabeçalho, não coluna, e o parser do rollback já ignorava linhas `#` — manifestos antigos (tab e legado `[modificado]`) continuam restauráveis, com teste de regressão. Spec: `meta/specs/260730-origem-do-backup.md` (wo0015).
+
 ### Alterado
 - **Vocabulário WO × spec e migração das skills (3ª atualização do KCM, template-update v1.94.0 — DEC-033, wo0014).** As instruções de aplicação saíram de `meta/specs/` para **`meta/workorders/`** (`git mv`; nomes preservados, numeração contínua — a próxima é `wo0014`), e o nome «spec» passou a designar a **spec de feature** do SDD (novo modelo `meta/SPEC.md`, uma por feature em `meta/specs/`). Os comandos `/` migraram do formato descontinuado `.claude/commands/*.md` para **`.claude/skills/<nome>/SKILL.md`** com front-matter: `/apply-spec` → **`/apply-wo`**, e `/wrap` atualizado. `meta/CEREBRO.md` foi mergeado com o template do kit (seções novas: «Técnicas específicas deste projeto», «Análise antes do compromisso», «Ao receber um template-update do KCM», «Bloco de fecho de turno», «Refino das Instruções», 3 regras de higiene), o `CLAUDE.md` da raiz ganhou vocabulário, teto de tamanho e seção de config, e o `.flatdropignore` passou ao formato de bloco do editor do FlatDrop. Novo `meta/workorders/_TEMPLATE.md`. **Sem mudança de código** — 0.9.2 e os 158 testes intactos.
 

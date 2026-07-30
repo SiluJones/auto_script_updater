@@ -7,6 +7,7 @@
 ---
 
 ## Versão Atual
+> **0.9.3 (2026-07-30)** — o backup registra a instrução de origem (`# Instrução:` no `manifest.txt`, terceiro campo no `history.log`). Sem mudança de formato; rollback de manifestos antigos coberto por regressão. Primeira feature entregue a partir de uma **spec de feature** (`meta/specs/260730-origem-do-backup.md`).
 **[0.9.2]** — 2026-07-20 — Atalho "abrir GUI" começa limpo; não restaura a última raiz (spec0012).
 
 > **Anterior:** [0.9.1] — 2026-07-20 — Atalho "abrir GUI" semeia a navegação na própria pasta (--start-dir, spec0011). [0.9.0] — 2026-07-20 — Backup segue a raiz; pasta zz_backups; QSettings isolado (spec0010, DEC-032). [0.8.7] — 2026-07-17 — Ressalva (🟡) visível também no CLI (spec0008, paridade com a GUI). [0.8.6] — 2026-07-16 — Syntax-highlight opcional no diff da GUI (Pygments, DEC-030). [0.8.5] — 2026-07-15 — Botão "Copiar saída" na GUI (spec0004). [0.8.4] — 2026-07-06 — Validador com dica acionável + rollback no history.log (spec0003). [0.8.3] — 2026-07-03 — Canal de warnings não-fatais / indicador 🟡 (DEC-028, ~144 testes). [0.8.2] — 2026-06-30 — Dicas "já aplicado?" no erro de âncora (DEC-026, 133 testes). [0.8.1] — 2026-06-28 — Backup padrão na pasta-pai da raiz (DEC-024c, 128 testes). [0.8.0] — 2026-06-28 — Launcher e backup na GUI (DEC-023/024 a/b, 126 testes). [0.7.0] — 2026-06-23 — F2 acesso rápido (112 testes). [0.6.0] — 2026-06-15 — backup configurável + sandbox na GUI (93 testes).

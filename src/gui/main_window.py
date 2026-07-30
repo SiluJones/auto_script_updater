@@ -552,6 +552,18 @@ class MainWindow(QMainWindow):
             return None
         return instruction
 
+    def _instruction_label(self) -> str:
+        """Origem da instrução, para o backup registrar de onde a sessão veio.
+
+        Nome do ARQUIVO (basename), não o caminho: o manifesto pode ser
+        compartilhado ao pedir ajuda, e o caminho absoluto vazaria a estrutura
+        de pastas do usuário. Colagem não tem arquivo — vira marcador explícito,
+        nunca campo vazio.
+        """
+        if self._pasted_text is not None and self.instr_edit.text() == self.PASTED_MARK:
+            return "(colado da área de transferência)"
+        return Path(self.instr_edit.text().strip()).name
+
     def _run(self, *, dry: bool, backup_location: str | Path | None = None) -> ApplyReport | None:
         texto = self._instruction_text()
         if texto is None:
@@ -566,6 +578,7 @@ class MainWindow(QMainWindow):
             dry_run=dry,
             backup_location=backup_location,
             color=False,
+            instruction_label=self._instruction_label(),
         )
 
     # ── Ações principais (também usadas pelos testes offscreen) ───────────
@@ -637,7 +650,11 @@ class MainWindow(QMainWindow):
                 return
             root_usada = str(sandbox)
             report = apply_instruction(
-                instruction, root_path=root_usada, dry_run=False, color=False
+                instruction,
+                root_path=root_usada,
+                dry_run=False,
+                color=False,
+                instruction_label=self._instruction_label(),
             )
         else:
             backup_location = self.backup_edit.text().strip() or None

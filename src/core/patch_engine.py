@@ -232,6 +232,7 @@ def apply_instruction(
     backup_location: str | Path | None = None,
     stop_on_error: bool | None = None,
     color: bool = True,
+    instruction_label: str | None = None,
 ) -> ApplyReport:
     """Aplica a instrução e retorna um :class:`ApplyReport`.
 
@@ -242,6 +243,8 @@ def apply_instruction(
             da raiz do projeto (DEC-024c); se a raiz não tiver pai utilizável
             (drive root), cai para dentro do projeto. O usuário pode apontar para
             qualquer pasta externa, mantendo a árvore do projeto limpa.
+        instruction_label: nome do arquivo de instrução (ou marcador de colagem),
+            gravado no backup para identificar a origem da sessão. Só rótulo.
     """
     settings = _effective_settings(
         instruction,
@@ -272,7 +275,12 @@ def apply_instruction(
         backup_root = _par if _par != project_root.resolve() else project_root
         project_name = None
     backup_mgr = (
-        BackupManager(backup_root, root=project_root, project_name=project_name)
+        BackupManager(
+            backup_root,
+            root=project_root,
+            project_name=project_name,
+            instruction_label=instruction_label,
+        )
         if use_backup
         else None
     )

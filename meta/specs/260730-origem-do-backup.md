@@ -2,7 +2,7 @@
 
 > Primeira **spec de feature** do repo (modelo em `meta/SPEC.md`, DEC-033).
 > Origem: nota do usuário de 2026-07-23, capturada no `meta/IDEAS.md` em 07-30.
-> **Status:** proposta — aguarda o aval do usuário no ponto de decisão da §Decisões.
+> **Status:** aceita e implementada em 2026-07-30 (wo0015, versão 0.9.3). Ponto de decisão resolvido pelo usuário: terceiro campo tab no `history.log`.
 > Alvo: `src/core/backup_manager.py` + `src/core/patch_engine.py` + os dois chamadores (CLI e GUI).
 
 ## Problema
@@ -35,8 +35,8 @@ Sem isso, o custo aparece no pior momento: na hora de reverter, sob pressão, es
 
 **4. Ausência é um valor, não um branco.** Sem rótulo (chamada programática, teste antigo), o cabeçalho simplesmente **não é escrito** — nada de `# Instrução: ` vazio, que confundiria mais do que ajudaria.
 
-> **Ponto de decisão (uma pergunta):** no `history.log`, a linha passa a ser
-> `<timestamp>\t<resumo>\t<arquivo>  <description>` — o nome do arquivo entra num **terceiro campo tab**, antes da descrição. A alternativa era colar o nome dentro da descrição (`<resumo>  [arquivo] descrição`), que não muda o número de campos mas mistura dois dados num só. Recomendo o terceiro campo: o `history.log` é lido por humano, mas um dia pode virar entrada de uma tela de "seleção de timestamps antigos no Desfazer" (item aberto da F2), e aí campo separado se paga.
+> **Decidido (usuário, 2026-07-30):** terceiro campo tab. A linha passa a ser
+> `<timestamp>\t<resumo>\t<arquivo>  <description>`. O campo é escrito **sempre**, vazio quando a origem é desconhecida, para que a posição da coluna seja estável — o `history.log` é lido por humano hoje, mas é o candidato natural a alimentar a tela de "seleção de timestamps antigos no Desfazer" (item aberto da F2). A alternativa descartada era colar o nome dentro da descrição, que não muda o número de campos mas mistura dois dados num só.
 
 ## Fora de escopo
 
