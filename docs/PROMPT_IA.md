@@ -4,6 +4,19 @@
 > seu projeto (Claude Project, system prompt, CLAUDE.md…), e suba o arquivo
 > `INSTRUCTION_GUIDE.md` na base de conhecimento. A partir daí, peça:
 > *"emita uma instrução ASU para estas mudanças"*.
+>
+> **ANTES de colar: o seu projeto usa o Kit de Contexto (KCM)?** Se o projeto
+> já tem um `CEREBRO.md`/`meta/CEREBRO.md`, ele provavelmente **já traz a
+> diretriz de saída do ASU**, curada e possivelmente diferente desta (entrega
+> como arquivo `.yaml` para baixar, sem linha de comando). Nesse caso **NÃO
+> cole o bloco abaixo**: suba apenas o `INSTRUCTION_GUIDE.md` e deixe o
+> CEREBRO mandar. Duas diretrizes concorrentes no mesmo contexto viram sorteio
+> — e a que perde costuma ser a que manda colar YAML no chat, que é como
+> âncora acentuada se corrompe (§4.7 do guia).
+>
+> Este aviso não é redundância com o kit: ele existe para quem está numa
+> versão antiga do KCM, que ainda recomenda colar este bloco. Não o remova
+> por parecer repetido.
 
 ─────────────────────────────────────────────────────────────────────────────
 

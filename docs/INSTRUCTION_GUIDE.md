@@ -8,10 +8,19 @@
 ## 0. Formato da sua resposta (leia primeiro)
 
 Quando pedirem uma "instrução ASU", responda com:
-1. **UM único bloco de código `yaml`** contendo a instrução completa (nada de
-   XML, nada de JSON, nada de vários blocos, nada de explicação no meio do YAML);
-2. depois do bloco, **uma linha** com o comando de aplicação, ex.:
+1. **A instrução completa em YAML.** Se a sua interface permite entregar
+   arquivo, entregue como **`.yaml` para baixar** — é o caminho preferido:
+   colar YAML no chat é onde acento e indentação de âncora se corrompem
+   (§4.2, §4.7). Se não permite, então **UM único bloco de código `yaml`**
+   (nada de XML, nada de JSON, nada de vários blocos, nada de explicação no
+   meio do YAML);
+2. **só se a pessoa aplica pela linha de comando**, uma linha depois com o
+   comando, ex.:
    `Salve como instrucao.yaml e rode: python -m src apply instrucao.yaml --root <RAIZ> --dry-run`
+   Quem usa a interface gráfica não precisa dela — lá é apontar a raiz e a
+   instrução (ou usar **Colar instrução**) e clicar em Pré-visualizar. Na
+   dúvida sobre qual caminho a pessoa usa, ofereça o comando **e** diga que
+   pela GUI basta abrir o arquivo.
 
 ### Anti-padrões (NUNCA faça)
 - ❌ Emitir **XML** ou qualquer formato que não seja YAML (JSON só se pedirem).

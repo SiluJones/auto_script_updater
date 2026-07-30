@@ -1,5 +1,10 @@
 # Instrução de DEMONSTRAÇÃO — executável de ponta a ponta.
 #
+# Este arquivo é para RODAR e para LER na sua máquina. Ele NÃO precisa ser
+# subido à base de conhecimento de nenhum projeto: quem ensina a IA a gerar
+# instruções é o docs/INSTRUCTION_GUIDE.md, cuja §2 já traz um exemplo
+# completo. Subir a demo junto só ocupa contexto a cada turno.
+#
 # Diferente de exemplo_instrucao.yaml (ilustrativo, com caminhos fictícios),
 # esta instrução aponta para arquivos REAIS em examples/demo_project/ e foi
 # feita para você rodar de verdade:
