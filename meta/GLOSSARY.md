@@ -89,6 +89,12 @@
 
 ---
 
+- **WO (work order)** — Instrução de APLICAÇÃO que o chat autora e o Code posiciona: âncora semântica + texto exato. Vive em `meta/workorders/AAMMDD-woNNNN-desc.md`; aplica-se com `/apply-wo`. Diz **como aplicar**. Até 2026-07-30 chamava-se «spec» neste repo (DEC-033).
+
+- **Spec de feature** — Documento do Spec-Driven Development que diz **o que** construir e **quando está pronto**: problema, critérios de aceite verificáveis, decisões de design, fora de escopo. Modelo em `meta/SPEC.md`, uma por feature em `meta/specs/`. Não é a WO.
+
+- **Análise** — Documento que precede o compromisso numa mudança não-trivial: problema, restrições medidas, opções (inclusive as descartadas), recomendação, riscos, ponto de decisão. Vive em `meta/analises/AAMMDD-ANALISE-<tema>.md`; a pasta nasce no primeiro uso. Gatilho concreto: mudar o formato de um artefato que outra pessoa vai ler ou editar, mesmo com diff pequeno.
+
 ## Identificadores
 
 - **DEC-N** — Decisão de arquitetura documentada em DECISIONS.md (ex: DEC-001).

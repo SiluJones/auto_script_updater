@@ -1,48 +1,51 @@
 # .flatdropignore — ASU (auto_script_updater)
-# Sintaxe .gitignore. Salvo na RAIZ do repo, versionado; tem a palavra final
-# sobre o que o FlatDrop SOBE ao mount do Projeto do Claude.
-# Tudo listado aqui CONTINUA no git — so NAO e enviado ao Projeto
-# (FlatDrop != deploy != git). Sao padroes POSITIVOS: excluem a mais o que a
-# allowlist do FlatDrop ja deixaria passar.
+# Sintaxe .gitignore. Salvo na RAIZ do repo, versionado; tem a palavra final sobre o que o
+# FlatDrop SOBE ao mount do Projeto do Claude. Tudo listado aqui CONTINUA no git — so NAO e
+# enviado ao Projeto (FlatDrop != deploy != git).
 #
-# CUIDADO (raia Chat): o chat so enxerga o MOUNT. O que sair daqui o chat NAO
-# le "sob demanda" — quem le e o Code (que tem o git). Se precisar estudar um
-# arquivo excluido DENTRO do Projeto, reinclua-o pontualmente com "!".
+# COMO ESTE ARQUIVO E ORGANIZADO (formato do editor do FlatDrop, adotado em 2026-07-30):
+# - Explicacao e comentario ficam AQUI EM CIMA, fora do bloco. Dentro do bloco eles somem:
+#   o editor do FlatDrop reescreve o bloco inteiro a cada salvamento.
+# - REGRA (o que some do mount) vai DENTRO do bloco "# >>> flatdrop-editor".
+# - NADA depois do "# <<<": vale a ULTIMA regra que casa, entao o que vier depois vence o bloco.
 #
-# Economia estimada nesta config: logs ~22k + specs ~25k + archive ~7,5k tokens
-# => o mount cai de ~186k para ~132k tokens, sem perder nada do git.
+# FORMA: use "pasta/*" (o CONTEUDO), nunca "pasta/" (a PASTA). A ferramenta costuma PODAR o
+# diretorio casado antes de descer, e um "!" la dentro nunca chega a ser avaliado (no git puro a
+# limitacao e normativa: nao se reinclui arquivo sob pasta excluida). Com "pasta/*" a varredura
+# desce e o "!arquivo" volta a valer. Corolario: modelo/guia de pasta ignorada precisa do PAR
+# completo — a linha "pasta/*" e a linha "!pasta/_TEMPLATE.md" logo depois dela, dentro do bloco.
+#
+# CUIDADO (raia Chat): o chat so enxerga o MOUNT. O que sair daqui o chat NAO le "sob demanda" —
+# quem le e o Code (que tem o git). Se precisar estudar um arquivo excluido DENTRO do Projeto,
+# reinclua-o pontualmente com "!" dentro do bloco.
+#
+# O QUE ESTA EXCLUIDO E POR QUE (DEC-031, atualizado por DEC-033):
+# - logs/*  — logs diarios de sessao (~22k tokens). Regra do projeto: logs vivem em logs/ no git e
+#   sao lidos sob demanda. O "agora" esta em meta/STATUS.md; o consolidado em meta/CHANGELOG.md.
+# - meta/workorders/*  — WOs ja aplicadas (~25k tokens; maior bloco redundante). O desfecho de cada
+#   uma vive em meta/DECISIONS.md (DEC-0xx), meta/CHANGELOG.md e meta/STATUS.md; o corpo bruto pesa.
+#   Inclui as instrucoes historicas AAMMDD-specNNNN-desc.md e as legadas F<n>-slug.md, que mudaram
+#   de pasta em 2026-07-30 (DEC-033). O _TEMPLATE.md e REINCLUIDO: o modelo sempre sobe, para a
+#   primeira sessao depois de uma transferencia ter o formato a mao.
+# - meta/DECISIONS-archive.md  — decisoes fundacionais F0-F1 (~7,5k tokens), consultadas raramente.
+#   O DECISIONS.md VIVO continua no mount.
+#
+# WO EM VOO: para o Code e o proximo chat verem a WO do ciclo atual, reinclua-a nominalmente dentro
+# do bloco, logo depois de meta/workorders/*, por exemplo:
+#   !meta/workorders/260730-wo0014-migracao-vocabulario-wo.md
+#
+# SALVAGUARDA (licao registrada no HANDOFF): ANTES de autorar uma WO, confira se ela ja existe. Com
+# as WOs fora do mount, a conferencia apoia em STATUS + CHANGELOG + DECISIONS (que citam cada uma
+# por numero). Foi a falta disso que fez spec0003/0004 serem reautoradas a toa.
+#
+# NAO se aplica ao ASU (referencia do modelo de origem): build web gerado (index.html) e
+# meta/analises/* — a pasta de analises nasce no primeiro uso; enquanto forem POUCAS, deixe subir
+# (analise "Em discussao" precisa ser relida no turno seguinte). Quando pesarem, acrescente o PAR
+# "meta/analises/*" + "!meta/analises/_TEMPLATE.md" dentro do bloco.
 
-# --- Logs diarios de sessao (~22k tokens) ---
-# Regra JA existente do projeto: "logs de sessao NAO ficam no Projeto; vivem em
-# logs/ no git e sao lidos sob demanda". O "agora" esta em meta/STATUS.md; o
-# consolidado em meta/CHANGELOG.md. Isto so passa a CUMPRIR essa regra.
-logs/
-
-# --- Specs ja aplicadas (~25k tokens; maior bloco redundante) ---
-# O desfecho de cada spec ja vive em meta/DECISIONS.md (DEC-0xx),
-# meta/CHANGELOG.md e meta/STATUS.md. O corpo bruto e historico e pesa muito.
-# Nota: usamos "meta/specs/*" (e NAO "meta/specs/") de proposito — o "!" abaixo
-# so consegue REINCLUIR um arquivo se a pasta nao foi excluida por inteiro.
-meta/specs/*
-
-# Specs EM ANDAMENTO (ainda nao aplicadas) devem continuar visiveis ao Code e ao
-# proximo chat. Reinclua a spec em voo do ciclo atual, ex.:
-#!meta/specs/260716-spec0006-syntax-highlight-diff.md
-
-# SALVAGUARDA (licao registrada no HANDOFF): ANTES de autorar uma spec, confira
-# se ela ja existe. Com as specs fora do mount, essa conferencia passa a apoiar
-# em STATUS + CHANGELOG + DECISIONS (que citam cada spec por numero). Mantenha
-# essa disciplina — foi assim que spec0003/0004 foram reautoradas a toa.
-
-# --- Arquivo historico de decisoes (~7,5k tokens) ---
-# Decisoes fundacionais F0-F1 arquivadas; consultadas raramente. O DECISIONS.md
-# VIVO continua no mount. Reinclua "!meta/DECISIONS-archive.md" para estudar uma
-# decisao antiga dentro do Projeto.
+# >>> flatdrop-editor
+logs/*
+meta/workorders/*
+!meta/workorders/_TEMPLATE.md
 meta/DECISIONS-archive.md
-
-# --- NAO se aplica ao ASU (deixado como referencia do modelo de origem) ---
-# O projeto "contexto-modular" tambem excluia um build gerado (index.html) e uma
-# pasta meta/analises/*. O ASU nao tem build web nem pasta meta/analises/ —
-# nada a excluir aqui. (Se um dia existir, descomente.)
-#index.html
-#meta/analises/*
+# <<<
