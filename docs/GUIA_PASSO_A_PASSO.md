@@ -153,9 +153,14 @@ comando.
   projeto (`PASTA\<nome-do-projeto>\<timestamp>\`) para não misturar. Nesse caso,
   repita o mesmo `--backup-dir` no `rollback`.
 - **Histórico rápido:** dentro da pasta de backups há um `history.log` — uma
-  linha por aplicação (data, nº de arquivos, descrição) **e também uma linha
-  quando você faz o Desfazer/rollback manual**, para acompanhar o histórico sem
-  abrir cada pasta de timestamp.
+  linha por aplicação (data, nº de arquivos, **qual instrução gerou aquela
+  leva**, descrição) **e também uma linha quando você faz o Desfazer/rollback
+  manual**, para acompanhar o histórico sem abrir cada pasta de timestamp. O
+  nome da instrução é o que resolve a dúvida real na hora de desfazer: com dois
+  ou três `.yaml` aplicados no mesmo dia, é ele que diz qual timestamp é o que
+  você quer. Dentro de cada pasta de sessão, o `manifest.txt` repete a origem na
+  primeira linha. Instrução colada da área de transferência aparece como
+  `(colado da área de transferência)`.
 - **Não gerar backup:** existe `--no-backup`, mas **não é recomendado** — sem
   backup, o desfazer automático não tem de onde restaurar. Prefira deixar o
   backup ligado e, se quiser, limpar as pastas antigas manualmente.

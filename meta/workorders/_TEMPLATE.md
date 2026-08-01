@@ -18,7 +18,7 @@
 
 > **Tipo:** WO de CODIGO · WO de DOC (registro) · mista.
 > **Config sugerida:** modelo e esforco para quem for aplicar (WO mecanica = Sonnet/baixo; WO que toca patch_engine ou backup_manager = Opus/alto).
-> **Pre-requisito:** versao/commit em que esta WO foi escrita, e o estado esperado (testes verdes, arvore limpa). Este repo esta em 0.9.2 / 158 testes.
+> **Pre-requisito:** versao/commit em que esta WO foi escrita, e o estado esperado (testes verdes, arvore limpa). Leia a versao no `src/__init__.py` e a contagem de testes no `meta/STATUS.md` na hora de escrever — nao copie do modelo, que envelhece.
 > **Base:** a decisao, a analise ou a conversa que originou.
 > **Depende de:** WOs que precisam estar aplicadas antes — ou apague a linha.
 > **Ancora semantica:** se um trecho-ancora nao bater EXATAMENTE, **PARE e reporte** — nunca chute um

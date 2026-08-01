@@ -9,10 +9,10 @@ aplica com um comando — ou pela interface gráfica.
 > Documentação de contexto completa (visão, arquitetura, decisões, armadilhas):
 > ver `meta/CONTEXT.md`, `meta/DECISIONS.md` e `meta/ROADMAP.md`.
 
-## Estado atual — 0.9.2
+## Estado atual — 0.9.3
 
 O núcleo (CLI) e a interface gráfica (PySide6) estão funcionais e testados
-(**158 testes**). A GUI reusa exatamente a mesma pilha do CLI
+(**165 testes**). A GUI reusa exatamente a mesma pilha do CLI
 (`parser → validator → engine`), sem lógica própria.
 
 Implementado:
@@ -33,7 +33,11 @@ Implementado:
   raiz troca o destino junto; configurável via `--backup-dir`. Backups antigos
   em `backups/` continuam restauráveis.
 - Log consolidado `history.log`: uma linha por aplicação **e também por rollback
-  manual** (Desfazer na GUI, `rollback` no CLI, `self-test`).
+  manual** (Desfazer na GUI, `rollback` no CLI, `self-test`). Cada linha de
+  aplicação traz **qual instrução a gerou** (o nome do arquivo), e o
+  `manifest.txt` da sessão repete a origem no cabeçalho — com várias instruções
+  circulando pelo mesmo projeto, é o que permite escolher o timestamp certo no
+  Desfazer sem abrir cada pasta.
 - **Canal de avisos não-fatais ("ressalva")** — um terceiro estado, *aplicado com
   ressalva*, entre sucesso e erro (ex.: `create_file` sobre um arquivo que já
   existe avisa da sobrescrita). O aviso **não aborta nem reverte** a aplicação; na
