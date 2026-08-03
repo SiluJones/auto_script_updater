@@ -64,7 +64,7 @@
 - [~] Botão "Desfazer última aplicação" entregue (rollback do timestamp da sessão); seleção de timestamps antigos pendente.
 - [x] Syntax-highlight opcional no diff da GUI via Pygments, com degradação graciosa (0.8.6, DEC-030).
 - [x] Atalho "abrir GUI" semeia a navegação na própria pasta e começa limpo (`--start-dir`, 0.9.1/0.9.2, specs 0011/0012).
-- [ ] Indicador de confiança por modificação (🟢 único / 🟡 ambíguo / 🔴 não encontrado).
+- [~] Indicador de confiança por modificação (🟢 único / 🟡 ambíguo / 🔴 não encontrado) — **superado em parte pela DEC-011 (2026-08-01).** O item foi escrito em 2026-06-03; depois disso a DEC-011 decidiu que **âncora ambígua é ERRO, não aviso**: casar mais de uma vez sem `location.occurrence` levanta `StrategyError` com mensagem explícita, e a prévia já mostra isso como ✗/🔴 antes de qualquer escrita. Ou seja, os estados 🟡 (ambíguo) e 🔴 (não encontrado) **já são visíveis** — como falha, que é mais seguro do que como alerta. O que resta do item original é só um verniz: pintar de verde o que passou. Não vale frente própria; se voltar, volta junto de outra mudança na árvore.
 - [ ] Suporte a tema claro/escuro seguindo a preferência do sistema (Qt color scheme).
 - [x] Botão "Colar instrução" — lê YAML da área de transferência (sem salvar arquivo).
 

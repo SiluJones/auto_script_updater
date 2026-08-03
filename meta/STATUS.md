@@ -62,6 +62,7 @@ Decisão do usuário: o ASU volta ao **repouso deliberado** na **0.9.2**, para m
 - **Documentação de usuário — PARCIALMENTE atualizada:** `README.md` e `GUIA_PASSO_A_PASSO.md` estão em **0.8.5** (backup na pasta-pai, `--backup-dir`, `history.log`, 13 estratégias, encodings, canal 🟡, dica do validador na borda, rollback no `history.log`, botão **Copiar saída**). **RESTA refrescar para 0.8.6→0.9.2** (chat autora arquivo inteiro, Code commita): **syntax-highlight** opcional no diff (0.8.6); **ressalva 🟡 no CLI** (0.8.7); pasta de backup **`zz_backups`** + o campo Backup que agora DERIVA da raiz e mostra o destino no placeholder (0.9.0, DEC-032); atalho **"abrir GUI"** que semeia a navegação e começa limpo (0.9.1/0.9.2). Captura de tela de PRODUÇÃO já disponível (run 2026-07-17, Novelista) para embutir. É a dívida nº 1 ao retomar — mas **não é bloqueador** e não urge durante o repouso.
 
 ## ❌ Quebrado / Com Problema
+- **Cosmético (0.9.3, achado em 2026-08-03):** quando o arquivo não é encontrado, o rótulo na árvore da GUI (e no resumo do CLI) mostra o `dict` cru da entrada — `{'id': …, 'path_mode': …}` — em vez do caminho. O erro em si está correto e legível; só o rótulo quebra. Causa e correção de uma linha registradas no `meta/IDEAS.md` (2026-08-03). Não bloqueia nada; parqueado pelo repouso de maturação.
 - Nenhum conhecido. (Os 5 bugs reportados nos consoles 06-13 e 06-14 — FIX-008 e FIX-009 — estão corrigidos e confirmados.)
 
 ## 📋 Backlog (curto prazo — itens acionáveis)
